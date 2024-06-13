@@ -11,6 +11,7 @@ from dipy.segment.metricspeed import AveragePointwiseEuclideanMetric
 from dipy.stats.analysis import assignment_map
 from dipy.tracking.streamline import Streamlines, length, unlist_streamlines
 from dipy.viz.plotting import bundle_shape_profile
+from dipy.testing.decorators import warning_for_keywords
 
 
 def average_bundle_length(bundle):
@@ -56,7 +57,8 @@ def find_missing(lst, cb):
     return [x for x in range(0, len(cb)) if x not in lst]
 
 
-def bundlewarp(static, moving, dist=None, alpha=0.3, beta=20, max_iter=15, affine=True):
+@warning_for_keywords()
+def bundlewarp(static, moving, dist=None, *, alpha=0.3, beta=20, max_iter=15, affine=True):
     """Register two bundles using nonlinear method.
 
     Parameters
@@ -227,8 +229,9 @@ def bundlewarp_vector_filed(moving_aligned, deformed_bundle):
     return offsets, directions, colors
 
 
+@warning_for_keywords()
 def bundlewarp_shape_analysis(
-    moving_aligned, deformed_bundle, no_disks=10, plotting=False
+    moving_aligned, deformed_bundle, *, no_disks=10, plotting=False
 ):
     """Calculate bundle shape difference profile.
 

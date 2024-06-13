@@ -11,10 +11,9 @@ from functools import partial
 import numbers
 import re
 from warnings import warn
-
 import nibabel as nib
 import numpy as np
-
+from dipy.testing.decorators import warning_for_keywords
 from dipy.align.imaffine import (
     AffineMap,
     AffineRegistration,
@@ -57,15 +56,13 @@ __all__ = [
     "register_dwi_series",
     "streamline_registration",
 ]
-
-# Global dicts for choosing metrics for registration:
 syn_metric_dict = {"CC": CCMetric, "EM": EMMetric, "SSD": SSDMetric}
-
 affine_metric_dict = {"MI": MutualInformationMetric}
 
 
+@warning_for_keywords()
 def _handle_pipeline_inputs(
-    moving, static, static_affine=None, moving_affine=None, starting_affine=None
+    moving, static, *, static_affine=None, moving_affine=None, starting_affine=None
 ):
     """
     Helper function to prepare inputs for pipeline functions
@@ -82,17 +79,18 @@ def _handle_pipeline_inputs(
         This is the registration matrix that is inherited from previous steps
         in the pipeline. Default: 4-by-4 identity matrix.
     """
-    static, static_affine = read_img_arr_or_path(static, affine=static_affine)
-    moving, moving_affine = read_img_arr_or_path(moving, affine=moving_affine)
+    (static, static_affine) = read_img_arr_or_path(static, affine=static_affine)
+    (moving, moving_affine) = read_img_arr_or_path(moving, affine=moving_affine)
     if starting_affine is None:
         starting_affine = np.eye(4)
+    return (static, static_affine, moving, moving_affine, starting_affine)
 
-    return static, static_affine, moving, moving_affine, starting_affine
 
-
+@warning_for_keywords()
 def syn_registration(
     moving,
     static,
+    *,
     moving_affine=None,
     static_affine=None,
     step_length=0.25,
@@ -140,21 +138,17 @@ def syn_registration(
 
     """
     level_iters = level_iters or [10, 10, 5]
-
-    static, static_affine, moving, moving_affine, _ = _handle_pipeline_inputs(
+    (static, static_affine, moving, moving_affine, _) = _handle_pipeline_inputs(
         moving,
         static,
         moving_affine=moving_affine,
         static_affine=static_affine,
         starting_affine=None,
     )
-
     use_metric = syn_metric_dict[metric.upper()](dim, **metric_kwargs)
-
     sdr = SymmetricDiffeomorphicRegistration(
         use_metric, level_iters, step_length=step_length
     )
-
     mapping = sdr.optimize(
         static,
         moving,
@@ -162,14 +156,15 @@ def syn_registration(
         moving_grid2world=moving_affine,
         prealign=prealign,
     )
-
     warped_moving = mapping.transform(moving)
-    return warped_moving, mapping
+    return (warped_moving, mapping)
 
 
+@warning_for_keywords()
 def register_dwi_to_template(
     dwi,
     gtab,
+    *,
     dwi_affine=None,
     template=None,
     template_affine=None,
@@ -217,21 +212,17 @@ def register_dwi_to_template(
     See :func:`register_dwi_series`.
 
     """
-    dwi_data, dwi_affine = read_img_arr_or_path(dwi, affine=dwi_affine)
-
+    (dwi_data, dwi_affine) = read_img_arr_or_path(dwi, affine=dwi_affine)
     if template is None:
         template = dpd.read_mni_template()
-
-    template_data, template_affine = read_img_arr_or_path(
+    (template_data, template_affine) = read_img_arr_or_path(
         template, affine=template_affine
     )
-
     if not isinstance(gtab, dpg.GradientTable):
         gtab = dpg.gradient_table(*gtab)
-
     mean_b0 = np.mean(dwi_data[..., gtab.b0s_mask], -1)
     if reg_method.lower() == "syn":
-        warped_b0, mapping = syn_registration(
+        (warped_b0, mapping) = syn_registration(
             mean_b0,
             template_data,
             moving_affine=dwi_affine,
@@ -239,7 +230,7 @@ def register_dwi_to_template(
             **reg_kwargs,
         )
     elif reg_method.lower() == "aff":
-        warped_b0, mapping = affine_registration(
+        (warped_b0, mapping) = affine_registration(
             mean_b0,
             template_data,
             moving_affine=dwi_affine,
@@ -250,8 +241,7 @@ def register_dwi_to_template(
         raise ValueError(
             f"reg_method should be one of 'aff' or 'syn', but you provided {reg_method}"
         )
-
-    return warped_b0, mapping
+    return (warped_b0, mapping)
 
 
 def write_mapping(mapping, fname):
@@ -274,7 +264,8 @@ def write_mapping(mapping, fname):
     save_nifti(fname, mapping_data, mapping.codomain_world2grid)
 
 
-def read_mapping(disp, domain_img, codomain_img, prealign=None):
+@warning_for_keywords()
+def read_mapping(disp, domain_img, codomain_img, *, prealign=None):
     """Read a syn registration mapping from a nifti file.
 
     Parameters
@@ -297,14 +288,11 @@ def read_mapping(disp, domain_img, codomain_img, prealign=None):
 
     """
     if isinstance(disp, str):
-        disp_data, disp_affine = load_nifti(disp)
-
+        (disp_data, disp_affine) = load_nifti(disp)
     if isinstance(domain_img, str):
         domain_img = nib.load(domain_img)
-
     if isinstance(codomain_img, str):
         codomain_img = nib.load(codomain_img)
-
     mapping = DiffeomorphicMap(
         3,
         disp_data.shape[:3],
@@ -315,16 +303,15 @@ def read_mapping(disp, domain_img, codomain_img, prealign=None):
         codomain_grid2world=codomain_img.affine,
         prealign=prealign,
     )
-
     mapping.forward = disp_data[..., 0]
     mapping.backward = disp_data[..., 1]
     mapping.is_inverse = True
-
     return mapping
 
 
+@warning_for_keywords()
 def resample(
-    moving, static, moving_affine=None, static_affine=None, between_affine=None
+    moving, static, *, moving_affine=None, static_affine=None, between_affine=None
 ):
     """Resample an image (moving) from one space to another (static).
 
@@ -358,8 +345,7 @@ def resample(
     resampled into the space of the static object.
 
     """
-
-    static, static_affine, moving, moving_affine, between_affine = (
+    (static, static_affine, moving, moving_affine, between_affine) = (
         _handle_pipeline_inputs(
             moving,
             static,
@@ -375,9 +361,11 @@ def resample(
     return nib.Nifti1Image(resampled, static_affine)
 
 
+@warning_for_keywords()
 def affine_registration(
     moving,
     static,
+    *,
     moving_affine=None,
     static_affine=None,
     pipeline=None,
@@ -493,9 +481,8 @@ def affine_registration(
     level_iters = level_iters or [10000, 1000, 100]
     sigmas = sigmas or [3, 1, 0.0]
     factors = factors or [4, 2, 1]
-
     starting_was_supplied = starting_affine is not None
-    static, static_affine, moving, moving_affine, starting_affine = (
+    (static, static_affine, moving, moving_affine, starting_affine) = (
         _handle_pipeline_inputs(
             moving,
             static,
@@ -504,55 +491,42 @@ def affine_registration(
             starting_affine=starting_affine,
         )
     )
-
-    # Define the Affine registration object we'll use with the chosen metric.
-    # For now, there is only one metric (mutual information)
     use_metric = affine_metric_dict[metric](**metric_kwargs)
-
     affreg = AffineRegistration(
         metric=use_metric, level_iters=level_iters, sigmas=sigmas, factors=factors
     )
-
-    # Convert pipeline to sanitized list of str
     pipeline = list(pipeline)
     for fi, func in enumerate(pipeline):
         if callable(func):
             for key, val in _METHOD_DICT.items():
-                if func is val[0]:  # if they passed the callable equiv.
+                if func is val[0]:
                     pipeline[fi] = func = key
                     break
         if not isinstance(func, str) or func not in _METHOD_DICT:
             raise ValueError(
-                f"pipeline[{fi}] must be one of " f"{list(_METHOD_DICT)}, got {func!r}"
+                f"pipeline[{fi}] must be one of {list(_METHOD_DICT)}, got {func!r}"
             )
-
     if pipeline == ["center_of_mass"] and ret_metric:
         raise ValueError(
             "center of mass registration cannot return any quality metric."
         )
-
-    # Go through the selected transformation:
     for func in pipeline:
         if func == "center_of_mass":
             if starting_affine is not None and starting_was_supplied:
                 wm = "starting_affine overwritten by center_of_mass transform"
                 warn(wm, UserWarning, stacklevel=2)
-
-            # multiply images by masks for transform_centers_of_mass
-            static_masked, moving_masked = static, moving
+            (static_masked, moving_masked) = (static, moving)
             if static_mask is not None:
                 static_masked = static * static_mask
             if moving_mask is not None:
                 moving_masked = moving * moving_mask
-
             transform = transform_centers_of_mass(
                 static_masked, static_affine, moving_masked, moving_affine
             )
             starting_affine = transform.affine
-
         else:
             transform = _METHOD_DICT[func][1]()
-            xform, xopt, fopt = affreg.optimize(
+            (xform, xopt, fopt) = affreg.optimize(
                 static,
                 moving,
                 transform,
@@ -565,51 +539,37 @@ def affine_registration(
                 moving_mask=moving_mask,
             )
             starting_affine = xform.affine
-
-    # Copy the final affine into a final variable
     final_affine = starting_affine.copy()
-
-    # After doing all that, resample once at the end:
     affine_map = AffineMap(
         final_affine, static.shape, static_affine, moving.shape, moving_affine
     )
-
     resampled = affine_map.transform(moving)
-
-    # Return the optimization metric only if requested
     if ret_metric:
-        return resampled, final_affine, xopt, fopt
-    return resampled, final_affine
+        return (resampled, final_affine, xopt, fopt)
+    return (resampled, final_affine)
 
 
 center_of_mass = partial(affine_registration, pipeline=["center_of_mass"])
 center_of_mass.__doc__ = (
     "Implements a center of mass transform. Based on `affine_registration()`."
 )
-
 translation = partial(affine_registration, pipeline=["translation"])
 translation.__doc__ = (
     "Implements a translation transform. Based on `affine_registration()`."
 )
-
 rigid = partial(affine_registration, pipeline=["rigid"])
 rigid.__doc__ = "Implements a rigid transform. Based on `affine_registration()`."
-
 rigid_isoscaling = partial(affine_registration, pipeline=["rigid_isoscaling"])
 rigid_isoscaling.__doc__ = (
     "Implements a rigid isoscaling transform. Based on `affine_registration()`."
 )
-
 rigid_scaling = partial(affine_registration, pipeline=["rigid_scaling"])
 rigid_scaling.__doc__ = (
     "Implements a rigid scaling transform. Based on `affine_registration()`."
 )
-
 affine = partial(affine_registration, pipeline=["affine"])
 affine.__doc__ = "Implements an affine transform. Based on `affine_registration()`."
-
-
-_METHOD_DICT = {  # mapping from str key -> (callable, class) tuple
+_METHOD_DICT = {
     "center_of_mass": (center_of_mass, None),
     "translation": (translation, TranslationTransform3D),
     "rigid_isoscaling": (rigid_isoscaling, RigidIsoScalingTransform3D),
@@ -619,8 +579,9 @@ _METHOD_DICT = {  # mapping from str key -> (callable, class) tuple
 }
 
 
+@warning_for_keywords()
 def register_series(
-    series, ref, pipeline=None, series_affine=None, ref_affine=None, static_mask=None
+    series, ref, *, pipeline=None, series_affine=None, ref_affine=None, static_mask=None
 ):
     """Register a series to a reference image.
 
@@ -656,8 +617,7 @@ def register_series(
 
     """
     pipeline = pipeline or ["center_of_mass", "translation", "rigid", "affine"]
-
-    series, series_affine = read_img_arr_or_path(series, affine=series_affine)
+    (series, series_affine) = read_img_arr_or_path(series, affine=series_affine)
     if isinstance(ref, numbers.Number):
         ref_as_idx = ref
         idxer = np.zeros(series.shape[-1]).astype(bool)
@@ -666,23 +626,21 @@ def register_series(
         ref_affine = series_affine
     else:
         ref_as_idx = False
-        ref, ref_affine = read_img_arr_or_path(ref, affine=ref_affine)
+        (ref, ref_affine) = read_img_arr_or_path(ref, affine=ref_affine)
         if len(ref.shape) != 3:
             raise ValueError(
                 "The reference image should be a single volume",
                 " or the index of one or more volumes",
             )
-
     xformed = np.zeros(series.shape)
     affines = np.zeros((4, 4, series.shape[-1]))
     for ii in range(series.shape[-1]):
         this_moving = series[..., ii]
         if isinstance(ref_as_idx, numbers.Number) and ii == ref_as_idx:
-            # This is the reference! No need to move and the xform is I(4):
             xformed[..., ii] = this_moving
             affines[..., ii] = np.eye(4)
         else:
-            transformed, reg_affine = affine_registration(
+            (transformed, reg_affine) = affine_registration(
                 this_moving,
                 ref,
                 moving_affine=series_affine,
@@ -692,12 +650,12 @@ def register_series(
             )
             xformed[..., ii] = transformed
             affines[..., ii] = reg_affine
+    return (xformed, affines)
 
-    return xformed, affines
 
-
+@warning_for_keywords()
 def register_dwi_series(
-    data, gtab, affine=None, b0_ref=0, pipeline=None, static_mask=None
+    data, gtab, *, affine=None, b0_ref=0, pipeline=None, static_mask=None
 ):
     """Register a DWI series to the mean of the B0 images in that series.
 
@@ -738,43 +696,33 @@ def register_dwi_series(
 
     """
     pipeline = pipeline or ["center_of_mass", "translation", "rigid", "affine"]
-
-    data, affine = read_img_arr_or_path(data, affine=affine)
+    (data, affine) = read_img_arr_or_path(data, affine=affine)
     if isinstance(gtab, collections.abc.Sequence):
         gtab = dpg.gradient_table(*gtab)
-
     if np.sum(gtab.b0s_mask) > 1:
-        # First, register the b0s into one image and average:
         b0_img = nib.Nifti1Image(data[..., gtab.b0s_mask], affine)
-        trans_b0, b0_affines = register_series(
+        (trans_b0, b0_affines) = register_series(
             b0_img, ref=b0_ref, pipeline=pipeline, static_mask=static_mask
         )
         ref_data = np.mean(trans_b0, -1, keepdims=True)
     else:
-        # There's only one b0 and we register everything to it
         trans_b0 = ref_data = data[..., gtab.b0s_mask]
         b0_affines = np.eye(4)[..., np.newaxis]
-
-    # Construct a series out of the DWI and the registered mean B0:
     moving_data = data[..., ~gtab.b0s_mask]
     series_arr = np.concatenate([ref_data, moving_data], -1)
     series = nib.Nifti1Image(series_arr, affine)
-
-    xformed, affines = register_series(
+    (xformed, affines) = register_series(
         series, ref=0, pipeline=pipeline, static_mask=static_mask
     )
-    # Cut out the part pertaining to that first volume:
     affines = affines[..., 1:]
     xformed = xformed[..., 1:]
     affine_array = np.zeros((4, 4, data.shape[-1]))
     affine_array[..., gtab.b0s_mask] = b0_affines
     affine_array[..., ~gtab.b0s_mask] = affines
-
     data_array = np.zeros(data.shape)
     data_array[..., gtab.b0s_mask] = trans_b0
     data_array[..., ~gtab.b0s_mask] = xformed
-
-    return nib.Nifti1Image(data_array, affine), affine_array
+    return (nib.Nifti1Image(data_array, affine), affine_array)
 
 
 motion_correction = partial(
@@ -782,15 +730,14 @@ motion_correction = partial(
 )
 motion_correction.__doc__ = re.sub(
     "Register.*?volume",
-    "Apply a motion "
-    "correction to a DWI dataset "
-    "(Between-Volumes Motion correction)",
+    "Apply a motion correction to a DWI dataset (Between-Volumes Motion correction)",
     register_dwi_series.__doc__,
     flags=re.DOTALL,
 )
 
 
-def streamline_registration(moving, static, n_points=100, native_resampled=False):
+@warning_for_keywords()
+def streamline_registration(moving, static, *, n_points=100, native_resampled=False):
     """Register two collections of streamlines ('bundles') to each other.
 
     Parameters
@@ -816,21 +763,17 @@ def streamline_registration(moving, static, n_points=100, native_resampled=False
         The affine transformation that takes us from 'moving' to 'static'
 
     """
-    # Load the streamlines, if you were given a file-name
     if isinstance(moving, str):
         moving = load_trk(moving, "same", bbox_valid_check=False).streamlines
     if isinstance(static, str):
         static = load_trk(static, "same", bbox_valid_check=False).streamlines
-
     srr = StreamlineLinearRegistration()
     srm = srr.optimize(
         static=set_number_of_points(static, n_points),
         moving=set_number_of_points(moving, n_points),
     )
-
     aligned = srm.transform(moving)
     if native_resampled:
         aligned = set_number_of_points(aligned, n_points)
         aligned = transform_tracking_output(aligned, np.linalg.inv(srm.matrix))
-
-    return aligned, srm.matrix
+    return (aligned, srm.matrix)
