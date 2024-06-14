@@ -9,9 +9,9 @@ from dipy.align.streamlinear import slr_with_qbx
 from dipy.segment.clustering import QuickBundles
 from dipy.segment.metricspeed import AveragePointwiseEuclideanMetric
 from dipy.stats.analysis import assignment_map
+from dipy.testing.decorators import warning_for_keywords
 from dipy.tracking.streamline import Streamlines, length, unlist_streamlines
 from dipy.viz.plotting import bundle_shape_profile
-from dipy.testing.decorators import warning_for_keywords
 
 
 def average_bundle_length(bundle):
@@ -58,7 +58,9 @@ def find_missing(lst, cb):
 
 
 @warning_for_keywords()
-def bundlewarp(static, moving, dist=None, *, alpha=0.3, beta=20, max_iter=15, affine=True):
+def bundlewarp(
+    static, moving, dist=None, *, alpha=0.3, beta=20, max_iter=15, affine=True
+):
     """Register two bundles using nonlinear method.
 
     Parameters

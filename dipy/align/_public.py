@@ -11,9 +11,10 @@ from functools import partial
 import numbers
 import re
 from warnings import warn
+
 import nibabel as nib
 import numpy as np
-from dipy.testing.decorators import warning_for_keywords
+
 from dipy.align.imaffine import (
     AffineMap,
     AffineRegistration,
@@ -35,6 +36,7 @@ import dipy.data as dpd
 from dipy.io.image import load_nifti, save_nifti
 from dipy.io.streamline import load_trk
 from dipy.io.utils import read_img_arr_or_path
+from dipy.testing.decorators import warning_for_keywords
 from dipy.tracking.streamline import set_number_of_points
 from dipy.tracking.utils import transform_tracking_output
 

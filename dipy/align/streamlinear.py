@@ -5,7 +5,6 @@ from time import time
 
 import numpy as np
 
-from dipy.testing.decorators import warning_for_keywords
 from dipy.align.bundlemin import (
     _bundle_minimum_distance,
     _bundle_minimum_distance_asymmetric,
@@ -14,6 +13,7 @@ from dipy.align.bundlemin import (
 from dipy.core.geometry import compose_matrix, compose_transformations, decompose_matrix
 from dipy.core.optimize import Optimizer
 from dipy.segment.clustering import qbx_and_merge
+from dipy.testing.decorators import warning_for_keywords
 from dipy.tracking.streamline import (
     Streamlines,
     center_streamlines,

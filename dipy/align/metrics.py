@@ -6,7 +6,6 @@ import numpy as np
 from numpy import gradient
 from scipy import ndimage
 
-from dipy.testing.decorators import warning_for_keywords
 from dipy.align import (
     crosscorr as cc,
     expectmax as em,
@@ -14,6 +13,7 @@ from dipy.align import (
     sumsqdiff as ssd,
     vector_fields as vfu,
 )
+from dipy.testing.decorators import warning_for_keywords
 
 
 class SimilarityMetric:

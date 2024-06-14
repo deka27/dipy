@@ -1,9 +1,11 @@
 import multiprocessing as mp
 import warnings
+
 import numpy as np
 from scipy.ndimage import affine_transform
-from dipy.utils.multiproc import determine_num_processes
+
 from dipy.testing.decorators import warning_for_keywords
+from dipy.utils.multiproc import determine_num_processes
 
 
 def _affine_transform(kwargs):

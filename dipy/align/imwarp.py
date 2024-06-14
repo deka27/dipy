@@ -8,9 +8,9 @@ from nibabel.streamlines import ArraySequence as Streamlines
 import numpy as np
 import numpy.linalg as npl
 
-from dipy.testing.decorators import warning_for_keywords
 from dipy.align import Bunch, VerbosityLevels, floating, vector_fields as vfu
 from dipy.align.scalespace import ScaleSpace
+from dipy.testing.decorators import warning_for_keywords
 
 RegistrationStages = Bunch(
     INIT_START=0,
@@ -746,7 +746,9 @@ class DiffeomorphicMap:
         )
 
     @warning_for_keywords()
-    def _transform_coordinates(self, points, coord2world, world2coord, *, inverse=False):
+    def _transform_coordinates(
+        self, points, coord2world, world2coord, *, inverse=False
+    ):
         is_streamline_obj = isinstance(points, Streamlines)
         data = points.get_data() if is_streamline_obj else points
 

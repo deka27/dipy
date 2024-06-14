@@ -17,7 +17,9 @@ It remains licensed as the rest of PyCPD (MIT license as of October 2010).
 
 import numbers
 from warnings import warn
+
 import numpy as np
+
 from dipy.testing.decorators import warning_for_keywords
 
 
@@ -186,7 +188,7 @@ class DeformableRegistration:
         self,
         X,
         Y,
-        *args,
+        *,
         sigma2=None,
         alpha=None,
         beta=None,
