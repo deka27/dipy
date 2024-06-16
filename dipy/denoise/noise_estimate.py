@@ -3,6 +3,7 @@ from scipy.ndimage import convolve
 from scipy.special import gammainccinv
 
 from dipy.utils.deprecator import deprecated_params
+from dipy.testing.decorators import warning_for_keywords
 
 
 def _inv_nchi_cdf(N, K, alpha):
@@ -284,7 +285,8 @@ def _piesno_3D(
     return sigma
 
 
-def estimate_sigma(arr, disable_background_masking=False, N=0):
+@warning_for_keywords()
+def estimate_sigma(arr, *, disable_background_masking=False, N=0):
     """Standard deviation estimation from local patches
 
     Parameters
