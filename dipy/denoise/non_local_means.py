@@ -5,7 +5,13 @@ from dipy.testing.decorators import warning_for_keywords
 
 
 @warning_for_keywords()
-def non_local_means(arr, sigma, *, mask=None, patch_radius=1, block_radius=5, rician=True):
+def non_local_means(arr,
+                    sigma,
+                    *,
+                    mask=None,
+                    patch_radius=1,
+                    block_radius=5,
+                    rician=True):
     r"""Non-local means for denoising 3D and 4D images, using
         blockwise averaging approach
 
