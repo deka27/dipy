@@ -649,7 +649,7 @@ def euler_matrix(ai, aj, ak, *, axes="sxyz"):
 
 @warning_for_keywords()
 def compose_matrix(
-    *,scale=None, shear=None, angles=None, translate=None, perspective=None
+    *, scale=None, shear=None, angles=None, translate=None, perspective=None
 ):
     """Return 4x4 transformation matrix from sequence of
     transformations.

@@ -7,6 +7,7 @@ import numpy as np
 import dipy.core.geometry as geometry
 from dipy.testing.decorators import warning_for_keywords
 
+
 @warning_for_keywords()
 def random_uniform_on_sphere(*, n=1, coords="xyz"):
     r"""Random unit vectors from a uniform distribution on the sphere.

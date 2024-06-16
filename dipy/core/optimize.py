@@ -21,7 +21,7 @@ class Optimizer:
         fun,
         x0,
         args=(),
-        *, 
+        *,
         method="L-BFGS-B",
         jac=None,
         hess=None,

@@ -167,7 +167,13 @@ class GradientTable:
 
     @warning_for_keywords()
     def __init__(
-        self, gradients, *, big_delta=None, small_delta=None, b0_threshold=50, btens=None
+        self,
+        gradients,
+        *,
+        big_delta=None,
+        small_delta=None,
+        b0_threshold=50,
+        btens=None
     ):
         """Constructor for GradientTable class"""
         gradients = np.asarray(gradients)

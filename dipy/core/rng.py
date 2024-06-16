@@ -7,6 +7,7 @@ import numpy as np
 
 from dipy.testing.decorators import warning_for_keywords
 
+
 @warning_for_keywords()
 def WichmannHill2006(*, ix=100001, iy=200002, iz=300003, it=400004):
     """Wichmann Hill (2006) random number generator.
