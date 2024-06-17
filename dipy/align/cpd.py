@@ -23,8 +23,7 @@ import numpy as np
 from dipy.testing.decorators import warning_for_keywords
 
 
-@warning_for_keywords()
-def gaussian_kernel(X, beta, *, Y=None):
+def gaussian_kernel(X, beta, Y=None):
     if Y is None:
         Y = X
     diff = X[:, None, :] - Y[None, :, :]
@@ -39,11 +38,11 @@ def low_rank_eigen(G, num_eig):
     Enables lower dimensional solving.
 
     """
-    (S, Q) = np.linalg.eigh(G)
+    S, Q = np.linalg.eigh(G)
     eig_indices = list(np.argsort(np.abs(S))[::-1][:num_eig])
-    Q = Q[:, eig_indices]
-    S = S[eig_indices]
-    return (Q, S)
+    Q = Q[:, eig_indices]  # eigenvectors
+    S = S[eig_indices]  # eigenvalues.
+    return Q, S
 
 
 def initialize_sigma2(X, Y):
@@ -93,12 +92,17 @@ def lowrankQS(G, beta, num_eig, *, eig_fgt=False):
         If True, use fast gauss transform method to speed up.
 
     """
+    # if we do not use FGT we construct affinity matrix G and find the
+    # first eigenvectors/values directly
+
     if eig_fgt is False:
-        (S, Q) = np.linalg.eigh(G)
+        S, Q = np.linalg.eigh(G)
         eig_indices = list(np.argsort(np.abs(S))[::-1][:num_eig])
-        Q = Q[:, eig_indices]
-        S = S[eig_indices]
-        return (Q, S)
+        Q = Q[:, eig_indices]  # eigenvectors
+        S = S[eig_indices]  # eigenvalues.
+
+        return Q, S
+
     elif eig_fgt is True:
         raise Exception("Fast Gauss Transform Not Implemented!")
 
@@ -201,40 +205,47 @@ class DeformableRegistration:
     ):
         if not isinstance(X, np.ndarray) or X.ndim != 2:
             raise ValueError("The target point cloud (X) must be at a 2D numpy array.")
+
         if not isinstance(Y, np.ndarray) or Y.ndim != 2:
             raise ValueError("The source point cloud (Y) must be a 2D numpy array.")
+
         if X.shape[1] != Y.shape[1]:
             msg = "Both point clouds need to have the same number "
             msg += "of dimensions."
             raise ValueError(msg)
+
         if sigma2 is not None and (
             not isinstance(sigma2, numbers.Number) or sigma2 <= 0
         ):
             msg = f"Expected a positive value for sigma2 instead got: {sigma2}"
             raise ValueError(msg)
+
         if max_iterations is not None and (
             not isinstance(max_iterations, numbers.Number) or max_iterations < 0
         ):
             msg = "Expected a positive integer for max_iterations "
             msg += f"instead got: {max_iterations}"
             raise ValueError(msg)
-        elif isinstance(max_iterations, numbers.Number) and (
-            not isinstance(max_iterations, int)
+        elif isinstance(max_iterations, numbers.Number) and not isinstance(
+            max_iterations, int
         ):
             msg = "Received a non-integer value for max_iterations: "
             msg += f"{max_iterations}. Casting to integer."
             warn(msg, stacklevel=2)
             max_iterations = int(max_iterations)
+
         if tolerance is not None and (
             not isinstance(tolerance, numbers.Number) or tolerance < 0
         ):
             msg = "Expected a positive float for tolerance "
             msg += f"instead got: {tolerance}"
             raise ValueError(msg)
+
         if w is not None and (not isinstance(w, numbers.Number) or w < 0 or w >= 1):
             msg = "Expected a value between 0 (inclusive) and 1 (exclusive) "
             msg += f"for w instead got: {w}"
             raise ValueError(msg)
+
         self.X = X
         self.Y = Y
         self.TY = Y
@@ -252,13 +263,16 @@ class DeformableRegistration:
         self.P1 = np.zeros((self.M,))
         self.PX = np.zeros((self.M, self.D))
         self.Np = 0
+
         if alpha is not None and (not isinstance(alpha, numbers.Number) or alpha <= 0):
             msg = "Expected a positive value for regularization parameter "
             msg += f"alpha. Instead got: {alpha}"
             raise ValueError(msg)
+
         if beta is not None and (not isinstance(beta, numbers.Number) or beta <= 0):
             msg = "Expected a positive value for the width of the coherent "
             msg += f"Gaussian kernel. Instead got: {beta}"
+
         self.alpha = 2 if alpha is None else alpha
         self.beta = 2 if beta is None else beta
         self.W = np.zeros((self.M, self.D))
@@ -266,7 +280,7 @@ class DeformableRegistration:
         self.low_rank = low_rank
         self.num_eig = num_eig
         if self.low_rank is True:
-            (self.Q, self.S) = low_rank_eigen(self.G, self.num_eig)
+            self.Q, self.S = low_rank_eigen(self.G, self.num_eig)
             self.inv_S = np.diag(1.0 / self.S)
             self.S = np.diag(self.S)
             self.E = 0.0
@@ -301,7 +315,8 @@ class DeformableRegistration:
                     "Y": self.TY,
                 }
                 callback(**kwargs)
-        return (self.TY, self.get_registration_parameters())
+
+        return self.TY, self.get_registration_parameters()
 
     def update_transform(self):
         """
@@ -315,10 +330,14 @@ class DeformableRegistration:
             )
             B = self.PX - np.dot(np.diag(self.P1), self.Y)
             self.W = np.linalg.solve(A, B)
+
         elif self.low_rank is True:
+            # Matlab code equivalent can be found here:
+            # https://github.com/markeroon/matlab-computer-vision-routines/tree/master/third_party/CoherentPointDrift
             dP = np.diag(self.P1)
             dPQ = np.matmul(dP, self.Q)
             F = self.PX - np.matmul(dP, self.Y)
+
             self.W = (
                 1
                 / (self.alpha * self.sigma2)
@@ -326,10 +345,14 @@ class DeformableRegistration:
                     F
                     - np.matmul(
                         dPQ,
-                        np.linalg.solve(
-                            self.alpha * self.sigma2 * self.inv_S
-                            + np.matmul(self.Q.T, dPQ),
-                            np.matmul(self.Q.T, F),
+                        (
+                            np.linalg.solve(
+                                (
+                                    self.alpha * self.sigma2 * self.inv_S
+                                    + np.matmul(self.Q.T, dPQ)
+                                ),
+                                (np.matmul(self.Q.T, F)),
+                            )
                         ),
                     )
                 )
@@ -361,13 +384,15 @@ class DeformableRegistration:
         if Y is not None:
             G = gaussian_kernel(X=Y, beta=self.beta, Y=self.Y)
             return Y + np.dot(G, self.W)
-        elif self.low_rank is False:
-            self.TY = self.Y + np.dot(self.G, self.W)
-        elif self.low_rank is True:
-            self.TY = self.Y + np.matmul(
-                self.Q, np.matmul(self.S, np.matmul(self.Q.T, self.W))
-            )
-            return
+        else:
+            if self.low_rank is False:
+                self.TY = self.Y + np.dot(self.G, self.W)
+
+            elif self.low_rank is True:
+                self.TY = self.Y + np.matmul(
+                    self.Q, np.matmul(self.S, np.matmul(self.Q.T, self.W))
+                )
+                return
 
     def update_variance(self):
         """Update the variance of the mixture model.
@@ -378,7 +403,12 @@ class DeformableRegistration:
 
         """
         qprev = self.sigma2
+
+        # The original CPD paper does not explicitly calculate the objective
+        # functional. This functional will include terms from both the negative
+        # log-likelihood and the Gaussian kernel used for regularization.
         self.q = np.inf
+
         xPx = np.dot(
             np.transpose(self.Pt1), np.sum(np.multiply(self.X, self.X), axis=1)
         )
@@ -386,9 +416,14 @@ class DeformableRegistration:
             np.transpose(self.P1), np.sum(np.multiply(self.TY, self.TY), axis=1)
         )
         trPXY = np.sum(np.multiply(self.TY, self.PX))
+
         self.sigma2 = (xPx - 2 * trPXY + yPy) / (self.Np * self.D)
+
         if self.sigma2 <= 0:
             self.sigma2 = self.tolerance / 10
+
+        # Here we use the difference between the current and previous
+        # estimate of the variance as a proxy to test for convergence.
         self.diff = np.abs(self.sigma2 - qprev)
 
     def get_registration_parameters(self):
@@ -403,7 +438,7 @@ class DeformableRegistration:
         self.W: numpy array
             Deformable transformation matrix.
         """
-        return (self.G, self.W)
+        return self.G, self.W
 
     def iterate(self):
         """Perform one iteration of the EM algorithm."""
@@ -413,6 +448,7 @@ class DeformableRegistration:
 
     def expectation(self):
         """Compute the expectation step of the EM algorithm."""
+        # (M, N)
         P = np.sum((self.X[None, :, :] - self.TY[:, None, :]) ** 2, axis=2)
         P = np.exp(-P / (2 * self.sigma2))
         c = (
@@ -422,8 +458,10 @@ class DeformableRegistration:
             * self.M
             / self.N
         )
-        den = np.sum(P, axis=0, keepdims=True)
+
+        den = np.sum(P, axis=0, keepdims=True)  # (1, N)
         den = np.clip(den, np.finfo(self.X.dtype).eps, None) + c
+
         self.P = np.divide(P, den)
         self.Pt1 = np.sum(self.P, axis=0)
         self.P1 = np.sum(self.P, axis=1)
