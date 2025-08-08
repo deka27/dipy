@@ -248,7 +248,8 @@ cdef class DeterministicMaximumDirectionGetter(ProbabilisticDirectionGetter):
 
         _len = self.len_pmf
         # Allocate blended PMF array
-        cdef np.ndarray[np.float64_t, ndim=1] blended_pmf = np.zeros(_len, dtype=np.float64)
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] blended_pmf
+        blended_pmf = np.zeros(_len, dtype=np.float64)
 
         # Blend PMFs from each corner voxel
         pmf_corner = self._get_pmf((x0, y0, z0))
