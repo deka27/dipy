@@ -799,25 +799,33 @@ def eudx_tracking(
     Tractogram
 
     """
-    sphere = sphere if sphere is not None else default_sphere
-    if pam is None:
-        raise ValueError("PAM should be defined.")
+    voxel_size = voxel_size if voxel_size is not None else voxel_sizes(affine)
 
-    # convert length in mm to number of points
-    min_len = int(min_len / step_size)
-    max_len = int(max_len / step_size)
-
-    return LocalTracking(
-        pam,
-        sc,
-        seed_positions,
-        affine,
+    params = generate_tracking_parameters(
+        "eudx",
+        min_len=min_len,
+        max_len=max_len,
         step_size=step_size,
-        minlen=min_len,
-        maxlen=max_len,
+        voxel_size=voxel_size,
+        max_angle=max_angle,
+        pmf_threshold=pmf_threshold,
         random_seed=random_seed,
         return_all=return_all,
-        initial_directions=seed_directions,
+    )
+    return generic_tracking(
+        seed_positions,
+        seed_directions,
+        sc,
+        params,
+        affine=affine,
+        sh=sh,
+        peaks=peaks,
+        sf=sf,
+        sphere=sphere,
+        basis_type=basis_type,
+        legacy=legacy,
+        nbr_threads=nbr_threads,
+        seed_buffer_fraction=seed_buffer_fraction,
         save_seeds=save_seeds,
     )
 

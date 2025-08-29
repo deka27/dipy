@@ -4,6 +4,7 @@
 # cython: Nonecheck=False
 
 from dipy.tracking.propspeed cimport (
+    eudx_propagator,
     deterministic_propagator,
     probabilistic_propagator,
     parallel_transport_propagator,
@@ -24,7 +25,18 @@ def generate_tracking_parameters(algo_name, *,
 
     algo_name = algo_name.lower()
 
-    if algo_name in ['deterministic', 'det']:
+    if algo_name == 'eudx':
+        params = TrackerParameters(max_len=max_len,
+                                   min_len=min_len,
+                                   step_size=step_size,
+                                   voxel_size=voxel_size,
+                                   pmf_threshold=pmf_threshold,
+                                   max_angle=max_angle,
+                                   random_seed=random_seed,
+                                   return_all=return_all)
+        params.set_tracker_c(eudx_propagator)
+        return params
+    elif algo_name in ['deterministic', 'det']:
         params = TrackerParameters(max_len=max_len,
                                    min_len=min_len,
                                    step_size=step_size,
