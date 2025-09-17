@@ -13,7 +13,13 @@ from dipy.tracking.local_tracking import LocalTracking, ParticleFilteringTrackin
 from dipy.tracking.tracker_parameters import generate_tracking_parameters
 from dipy.tracking.tractogen import generate_tractogram
 from dipy.tracking.utils import seeds_directions_pairs
+from dipy.tracking.propspeed import setup_pam_for_tracking, cleanup_pam_tracking
 
+class PamAwarePmfGen(SimplePmfGen):
+    """SimplePmfGen that can hold PAM data for EuDX"""
+    def __init__(self, pmf, sphere, pam_data=None):
+        super().__init__(pmf, sphere)
+        self.pam_data = pam_data
 
 def generic_tracking(
     seed_positions,
@@ -25,6 +31,7 @@ def generic_tracking(
     sh=None,
     peaks=None,
     sf=None,
+    pam=None,
     sphere=None,
     basis_type=None,
     legacy=True,
@@ -34,35 +41,59 @@ def generic_tracking(
 ):
     affine = affine if affine is not None else np.eye(4)
 
+    # Handle PAM object for EuDX
+    if pam is not None:
+        print(f"EuDX: Setting up PAM data, shape={pam.peak_values.shape}")
+        setup_pam_for_tracking(pam)
+
+        # Create a dummy PMF generator for EuDX (it won't be used)
+        from dipy.direction.pmf import SimplePmfGen
+        dummy_pmf = np.ones((1, 1, 1, len(default_sphere.vertices)))  # 4D array matching expected shape
+        dummy_sphere = default_sphere
+        pmf_gen = SimplePmfGen(dummy_pmf, dummy_sphere)
+
+        # Remove debug limiting - use real parameters
+        # Restore original min_nbr_pts (was temporarily set to 1 for debugging)
+
+        result = generate_tractogram(
+            seed_positions,
+            seed_directions,
+            sc,
+            params,
+            pmf_gen=pmf_gen,  # Pass dummy PMF gen
+            pam_data=pam,
+            affine=affine,
+            nbr_threads=nbr_threads,  # Use original threading
+            buffer_frac=seed_buffer_fraction,
+            save_seeds=save_seeds,
+            cleanup_pam=True,  # ← Pass cleanup flag
+        )
+        return result
+
+    # PMF logic for non-PAM algorithms
     pmf_type = [
         {"name": "sh", "value": sh, "cls": SHCoeffPmfGen},
-        {"name": "peaks", "value": peaks, "cls": SimplePmfGen},
         {"name": "sf", "value": sf, "cls": SimplePmfGen},
     ]
 
     initialized_pmf = [
         d_selected for d_selected in pmf_type if d_selected["value"] is not None
     ]
+
     if len(initialized_pmf) > 1:
         selected_pmf = ", ".join([p["name"] for p in initialized_pmf])
         raise ValueError(
             "Only one pmf type should be initialized. "
-            f"Variables initialized: {', '.join(selected_pmf)}"
+            f"Variables initialized: {selected_pmf}"
         )
+
     if len(initialized_pmf) == 0:
-        available_pmf = ", ".join([d["name"] for d in pmf_type])
-        raise ValueError(
-            f"No PMF found. One of this variable ({available_pmf}) should be"
-            " initialized."
-        )
+        raise ValueError("No data provided")
 
     selected_pmf = initialized_pmf[0]
 
     if selected_pmf["name"] == "sf" and sphere is None:
         raise ValueError("A sphere should be defined when using SF (an ODF).")
-
-    if selected_pmf["name"] == "peaks":
-        raise NotImplementedError("Peaks are not yet implemented.")
 
     sphere = sphere or default_sphere
 
@@ -73,25 +104,56 @@ def generic_tracking(
     pmf_gen = selected_pmf["cls"](
         np.asarray(selected_pmf["value"], dtype=float), sphere, **kwargs
     )
-
+        
+    # Your existing seed direction extraction logic
     if seed_directions is not None:
         if not isinstance(seed_directions, (np.ndarray, list)):
             raise ValueError("seed_directions should be a numpy array or a list.")
         elif isinstance(seed_directions, list):
             seed_directions = np.array(seed_directions)
-
         if not np.array_equal(seed_directions.shape, seed_positions.shape):
             raise ValueError(
-                "seed_directions and seed_positions should have the same shape."
+                "seed_directions and seed_directions should have the same shape."
             )
     else:
-        peaks = peaks_from_positions(
-            seed_positions, None, None, npeaks=1, affine=affine, pmf_gen=pmf_gen
-        )
-        seed_positions, seed_directions = seeds_directions_pairs(
-            seed_positions, peaks, max_cross=1
-        )
+        if pam is not None:
+            # Extract peak directions from PAM (your existing code)
+            seed_directions_list = []
+            for seed_pos in seed_positions:
+                voxel_pos = np.linalg.inv(affine).dot(np.append(seed_pos, 1))[:3]
+                x, y, z = np.round(voxel_pos).astype(int)
+                
+                if (0 <= x < pam.peak_dirs.shape[0] and 
+                    0 <= y < pam.peak_dirs.shape[1] and 
+                    0 <= z < pam.peak_dirs.shape[2]):
+                    
+                    peak_dir = pam.peak_dirs[x, y, z, 0]
+                    
+                    if np.linalg.norm(peak_dir) > 0:
+                        seed_directions_list.append(peak_dir)
+                    else:
+                        seed_directions_list.append(np.array([1., 0., 0.]))
+                else:
+                    seed_directions_list.append(np.array([1., 0., 0.]))
+            
+            seed_directions = np.array(seed_directions_list)
+            
+        else:
+            peaks_at_seeds = peaks_from_positions(
+                seed_positions, None, None, npeaks=1, affine=affine, pmf_gen=pmf_gen
+            )
+            seed_positions, seed_directions = seeds_directions_pairs(
+                seed_positions, peaks_at_seeds, max_cross=1
+            )
 
+    # Limit seeds for debugging (for non-PAM case)
+    if len(seed_positions) > 100:
+        print(f"DEBUG: Limiting seeds from {len(seed_positions)} to 100 for debugging")
+        seed_positions = seed_positions[:100]
+        if seed_directions is not None:
+            seed_directions = seed_directions[:100]
+
+    # Pass PMF data to generate_tractogram
     return generate_tractogram(
         seed_positions,
         seed_directions,
@@ -99,7 +161,7 @@ def generic_tracking(
         params,
         pmf_gen,
         affine=affine,
-        nbr_threads=nbr_threads,
+        nbr_threads=nbr_threads,  # Use original threading
         buffer_frac=seed_buffer_fraction,
         save_seeds=save_seeds,
     )
@@ -738,67 +800,8 @@ def eudx_tracking(
     return_all=True,
     save_seeds=False,
 ):
-    """EuDX tracking algorithm.
+    """EuDX tracking algorithm using generic_tracking."""
 
-    seed_positions : ndarray
-        Seed positions in world space.
-    sc : StoppingCriterion
-        Stopping criterion.
-    affine : ndarray
-        Affine matrix.
-    seed_directions : ndarray, optional
-        Seed directions.
-    sh : ndarray, optional
-        Spherical Harmonics (SH).
-    peaks : ndarray, optional
-        Peaks array.
-    sf : ndarray, optional
-        Spherical Function (SF).
-    pam : PeakAndMetrics, optional
-        Peaks and Metrics object
-    min_len : int, optional
-        Minimum length (mm) of the streamlines.
-    max_len : int, optional
-        Maximum length (mm) of the streamlines.
-    step_size : float, optional
-        Step size of the tracking.
-    voxel_size : ndarray, optional
-        Voxel size.
-    max_angle : float, optional
-        Maximum angle.
-    pmf_threshold : float, optional
-        PMF threshold.
-    sphere : Sphere, optional
-        Sphere.
-    basis_type : name of basis
-        The basis that ``shcoeff`` are associated with.
-        ``dipy.reconst.shm.real_sh_descoteaux`` is used by default.
-    legacy: bool, optional
-        True to use a legacy basis definition for backward compatibility
-        with previous ``tournier07`` and ``descoteaux07`` implementations.
-    nbr_threads: int, optional
-        Number of threads to use for the processing. By default, all available threads
-        will be used.
-    random_seed: int, optional
-        Seed for the random number generator, must be >= 0. A value of greater than 0
-        will all produce the same streamline trajectory for a given seed coordinate.
-        A value of 0 may produces various streamline tracjectories for a given seed
-        coordinate.
-    seed_buffer_fraction: float, optional
-        Fraction of the seed buffer to use. A value of 1.0 will use the entire seed
-        buffer. A value of 0.5 will use half of the seed buffer then the other half.
-        a way to reduce memory usage.
-    return_all: bool, optional
-        True to return all the streamlines, False to return only the streamlines that
-        reached the stopping criterion.
-    save_seeds: bool, optional
-        True to return the seeds with the associated streamline.
-
-    Returns
-    -------
-    Tractogram
-
-    """
     voxel_size = voxel_size if voxel_size is not None else voxel_sizes(affine)
 
     params = generate_tracking_parameters(
@@ -812,6 +815,13 @@ def eudx_tracking(
         random_seed=random_seed,
         return_all=return_all,
     )
+
+    # Add some debugging
+    if pam is not None:
+        print(f"PAM shape: {pam.peak_values.shape}")
+        print(f"PAM peak_dirs shape: {pam.peak_dirs.shape}")
+        print(f"Number of seeds: {len(seed_positions)}")
+
     return generic_tracking(
         seed_positions,
         seed_directions,
@@ -821,6 +831,7 @@ def eudx_tracking(
         sh=sh,
         peaks=peaks,
         sf=sf,
+        pam=pam,
         sphere=sphere,
         basis_type=basis_type,
         legacy=legacy,

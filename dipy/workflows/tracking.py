@@ -40,7 +40,7 @@ class LocalFiberTrackingPAMFlow(Workflow):
         minlen=2,
         maxlen=500,
         step_size=0.5,
-        tracking_method="deterministic",
+        tracking_method="eudx",
         pmf_threshold=0.1,
         max_angle=30.0,
         sphere_name=None,
@@ -173,15 +173,12 @@ class LocalFiberTrackingPAMFlow(Workflow):
                     nbr_threads=nbr_threads,
                     seed_buffer_fraction=seed_buffer_fraction,
                 )
-            elif tracking_method in [
-                "eudx",
-            ]:
+            elif tracking_method in ["eudx"]:
                 tracking_result = eudx_tracking(
                     seeds,
                     stopping_criterion,
                     affine,
-                    sh=pam.shm_coeff,
-                    pam=pam,
+                    pam=pam,  # ← Make sure PAM is passed
                     random_seed=random_seed,
                     sphere=sphere,
                     max_angle=max_angle,

@@ -5,6 +5,13 @@ from dipy.tracking.tracker_parameters cimport TrackerParameters, TrackerStatus
 from dipy.utils.fast_numpy cimport RNGState
 
 
+cdef TrackerStatus eudx_propagator(double* point,
+                                   double* direction,
+                                   TrackerParameters params,
+                                   double* stream_data,
+                                   PmfGen pmf_gen,
+                                   RNGState* rng) noexcept nogil
+
 cdef TrackerStatus deterministic_propagator(double* point,
                                             double* direction,
                                             TrackerParameters params,
