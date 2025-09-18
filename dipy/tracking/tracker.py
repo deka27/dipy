@@ -14,6 +14,7 @@ from dipy.tracking.tracker_parameters import generate_tracking_parameters
 from dipy.tracking.tractogen import generate_tractogram
 from dipy.tracking.utils import seeds_directions_pairs
 from dipy.tracking.propspeed import setup_pam_for_tracking, cleanup_pam_tracking
+from dipy.direction.pmf import SimplePmfGen
 
 class PamAwarePmfGen(SimplePmfGen):
     """SimplePmfGen that can hold PAM data for EuDX"""
@@ -59,7 +60,6 @@ def generic_tracking(
                     0 <= y < pam.peak_dirs.shape[1] and
                     0 <= z < pam.peak_dirs.shape[2]):
 
-                    # Extract ALL peaks for this voxel (like old LocalTracking)
                     valid_peaks_found = False
                     for peak_idx in range(pam.peak_dirs.shape[3]):
                         peak_dir = pam.peak_dirs[x, y, z, peak_idx]
@@ -67,7 +67,7 @@ def generic_tracking(
 
                         # Include peaks above threshold (PAM values are normalized [0,1])
                         peak_norm = np.linalg.norm(peak_dir)
-                        if peak_norm > 1e-6 and peak_val > 0.02:  # Quality threshold
+                        if peak_norm > 1e-6 and peak_val > 0.1:
                             # Normalize the peak direction
                             peak_dir_normalized = peak_dir / peak_norm
                             expanded_seeds_list.append(seed_pos.copy())
@@ -89,8 +89,7 @@ def generic_tracking(
 
             # Expansion complete
 
-        # Create a dummy PMF generator for EuDX (it won't be used)
-        from dipy.direction.pmf import SimplePmfGen
+        # Dummy PMF generator for EuDX (it won't be used)
         dummy_pmf = np.ones((1, 1, 1, len(default_sphere.vertices)))  # 4D array matching expected shape
         dummy_sphere = default_sphere
         pmf_gen = SimplePmfGen(dummy_pmf, dummy_sphere)
@@ -100,13 +99,13 @@ def generic_tracking(
             seed_directions,
             sc,
             params,
-            pmf_gen=pmf_gen,  # Pass dummy PMF gen
+            pmf_gen=pmf_gen,
             pam_data=pam,
             affine=affine,
-            nbr_threads=nbr_threads,  # Use original threading
+            nbr_threads=nbr_threads,
             buffer_frac=seed_buffer_fraction,
             save_seeds=save_seeds,
-            cleanup_pam=True,  # ← Pass cleanup flag
+            cleanup_pam=True,
         )
         return result
 
@@ -163,8 +162,6 @@ def generic_tracking(
             seed_positions, peaks_at_seeds, max_cross=1
         )
 
-
-    # Pass PMF data to generate_tractogram
     return generate_tractogram(
         seed_positions,
         seed_directions,
@@ -172,7 +169,7 @@ def generic_tracking(
         params,
         pmf_gen,
         affine=affine,
-        nbr_threads=nbr_threads,  # Use original threading
+        nbr_threads=nbr_threads,
         buffer_frac=seed_buffer_fraction,
         save_seeds=save_seeds,
     )

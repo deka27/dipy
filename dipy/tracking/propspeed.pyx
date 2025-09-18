@@ -843,8 +843,8 @@ cdef TrackerStatus eudx_propagator(double* point,
     cdef:
         cnp.npy_intp result
         double qa_thr = 0.1  # Threshold for PAM values [0,1]
-        double ang_thr = 60.0  # Standard angular threshold
-        double total_weight = 0.5  # Standard weight threshold
+        double ang_thr = 60.0  # Angular threshold
+        double total_weight = 0.5  # Weight threshold
 
     # Check if PAM data is available
     if global_pam_peak_values == NULL or global_pam_peak_dirs == NULL:
@@ -857,7 +857,7 @@ cdef TrackerStatus eudx_propagator(double* point,
             # Point is outside volume
             return TrackerStatus.FAIL
 
-    # Use trilinear interpolation like the original EuDX implementation
+    # Trilinear interpolation
     result = _eudx_propagation_direction(point, direction,
                                         global_pam_peak_values,
                                         global_pam_peak_dirs,
