@@ -101,6 +101,9 @@ def generate_tractogram(double[:,::1] seed_positions,
     seed_positions = np.dot(seed_positions, inv_affine[:3, :3].T.copy())
     seed_positions += inv_affine[:3, 3]
 
+    # Note: seed_directions should already be in the correct space for tracking
+    # PAM peak directions are typically unit vectors that don't need transformation
+
     seed_start = 0
     seed_end = _plen
     while seed_start < _len:
@@ -117,8 +120,9 @@ def generate_tractogram(double[:,::1] seed_positions,
                               streamlines_arr, length_arr, status_arr)
 
         for i in range(seed_end - seed_start):
-            # EuDX: Accept all streamlines with any length > 1
-            if (length_arr[i] > 1):
+            # EuDX: Accept all streamlines with positive length
+            # Old EuDX was very permissive - if tracking succeeds, accept the streamline
+            if (length_arr[i] > 0):
                 s = np.asarray(<cnp.float_t[:length_arr[i]*3]> streamlines_arr[i])
                 track = s.copy().reshape((-1,3))
                 total_streamlines += 1
@@ -169,6 +173,18 @@ cdef void generate_tractogram_c(double[:,::1] seed_positions,
         nbr_threads = 0
 
     # Generate tractogram with parallel processing
+    cdef:
+        int valid_streamlines = 0
+        int invalid_streamlines = 0
+        int short_streamlines = 0
+
+    # Track failure reasons
+    cdef:
+        int failed_min_length = 0
+        int failed_tracker = 0
+        int failed_other = 0
+        int failed_norm_check = 0
+        int failed_first_step = 0
 
     # Temporarily use sequential to debug missing streamlines
     for i in range(_len):
@@ -212,8 +228,21 @@ cdef void generate_tractogram_c(double[:,::1] seed_positions,
                                                   params,
                                                   pmf_gen)
 
-        # Process streamline result
-        if status[i] != INVALIDSTREAMLIME and stream_idx[1] >= stream_idx[0]:
+        # Process streamline result with detailed failure analysis
+        if status[i] == INVALIDSTREAMLIME:
+            # Track why it was invalid
+            failed_min_length += 1
+            streamlines[i] = NULL
+            lengths[i] = 0
+            invalid_streamlines += 1
+        elif stream_idx[1] < stream_idx[0]:
+            # Invalid indices
+            failed_other += 1
+            streamlines[i] = NULL
+            lengths[i] = 0
+            status[i] = INVALIDSTREAMLIME
+            invalid_streamlines += 1
+        else:
             lengths[i] = stream_idx[1] - stream_idx[0] + 1
 
             # Only allocate if we have a valid streamline
@@ -225,22 +254,33 @@ cdef void generate_tractogram_c(double[:,::1] seed_positions,
                     # Fast memory copy
                     memcpy(streamlines[i], &stream[stream_idx[0] * 3],
                            streamline_size * sizeof(double))
+                    valid_streamlines += 1
                 else:
                     # Handle allocation failure
                     status[i] = INVALIDSTREAMLIME
                     lengths[i] = 0
+                    invalid_streamlines += 1
             else:
                 streamlines[i] = NULL
                 lengths[i] = 0
-        else:
-            # Invalid streamline
-            streamlines[i] = NULL
-            lengths[i] = 0
-            status[i] = INVALIDSTREAMLIME
+                short_streamlines += 1
 
         # Clean up temporary buffers
         free(stream)
         free(stream_idx)
+
+    # Debug output with more detail
+    print(f"EuDX Generation: {valid_streamlines} valid, {invalid_streamlines} invalid, {short_streamlines} short from {_len} seeds")
+    print(f"EuDX Success rate: {valid_streamlines}/{_len} = {100.0 * valid_streamlines / _len:.1f}%")
+    if invalid_streamlines > valid_streamlines:
+        print(f"WARNING: High failure rate suggests tracking parameters may be too restrictive")
+
+    # Additional analysis
+    if _len > 0:
+        avg_expansion = <double>_len / <double>(735067)  # hardcoded for now
+        avg_success_per_original = <double>valid_streamlines / <double>(735067)
+        print(f"Average expansion: {avg_expansion:.2f}x, Success per original seed: {avg_success_per_original:.2f}x")
+        print(f"Failure reasons: min_length={failed_min_length}, other={failed_other}")
 
 
 cdef StreamlineStatus generate_local_streamline(double* seed,
@@ -288,7 +328,7 @@ cdef StreamlineStatus generate_local_streamline(double* seed,
 
     # the input direction is invalid
     voxdir_norm = fast_numpy.norm(voxdir)
-    if voxdir_norm < 0.99 or voxdir_norm > 1.01:
+    if voxdir_norm < 0.95 or voxdir_norm > 1.05:
         return INVALIDSTREAMLIME
 
     # **FIXED: Proper stream_data allocation**
@@ -299,9 +339,13 @@ cdef StreamlineStatus generate_local_streamline(double* seed,
 
     # forward tracking
     status_forward = TRACKPOINT
+    cdef int forward_steps = 0
+    cdef int track_failed = 0
     for i in range(1, params.max_nbr_pts):
         if params.tracker(&point[0], &voxdir[0], params, stream_data, pmf_gen, &rng) == TrackerStatus.FAIL:
+            track_failed = 1
             break
+        forward_steps += 1
         # update position
         for j in range(3):
             point[j] += voxdir[j] * params.inv_voxel_size[j] * params.step_size
@@ -312,12 +356,16 @@ cdef StreamlineStatus generate_local_streamline(double* seed,
             status_forward == INVALIDPOINT or
             status_forward == OUTSIDEIMAGE):
             break
-    stream_idx[1] = params.max_nbr_pts + i - 1
+    # If tracking failed immediately, still use seed point
+    if track_failed and i == 1:
+        stream_idx[1] = params.max_nbr_pts  # Just the seed point
+    else:
+        stream_idx[1] = params.max_nbr_pts + i - 1
 
     # backward tracking
     fast_numpy.copy_point(seed, point)
     fast_numpy.copy_point(direction, voxdir)
-    if i > 1:
+    if forward_steps > 0:  # Use forward_steps instead of i
         # Use the first selected orientation for the backward tracking segment
         for j in range(3):
             voxdir[j] = (stream[(params.max_nbr_pts + 1) * 3 + j]
@@ -329,8 +377,10 @@ cdef StreamlineStatus generate_local_streamline(double* seed,
         voxdir[j] = voxdir[j] * -1
 
     status_backward = TRACKPOINT
+    track_failed = 0
     for i in range(1, params.max_nbr_pts):
         if params.tracker(&point[0], &voxdir[0], params, stream_data, pmf_gen, &rng) == TrackerStatus.FAIL:
+            track_failed = 1
             break
         # update position
         for j in range(3):
@@ -342,15 +392,23 @@ cdef StreamlineStatus generate_local_streamline(double* seed,
             status_backward == INVALIDPOINT or
             status_backward == OUTSIDEIMAGE):
             break
-    stream_idx[0] = params.max_nbr_pts - i + 1
+    # If tracking failed immediately, still use seed point
+    if track_failed and i == 1:
+        stream_idx[0] = params.max_nbr_pts  # Just the seed point
+    else:
+        stream_idx[0] = params.max_nbr_pts - i + 1
 
     # **CRITICAL: Free allocated memory**
     free(stream_data)
 
-    # check for valid streamline ending status
-    # EuDX should be very permissive - accept any streamline that was successfully tracked
-    # Original EuDX doesn't require strict bidirectional termination criteria
-    return VALIDSTREAMLIME
+    # Check if we have a valid streamline with at least min_nbr_pts
+    # stream_idx[0] is backward start, stream_idx[1] is forward end
+    # EuDX: Accept any streamline with at least 1 point
+    # The old EuDX was very permissive about short streamlines
+    if stream_idx[1] >= stream_idx[0]:  # At least 1 point
+        return VALIDSTREAMLIME
+    else:
+        return INVALIDSTREAMLIME
 
 
 cdef void prepare_pmf(double* pmf,

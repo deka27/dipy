@@ -46,14 +46,56 @@ def generic_tracking(
         print(f"EuDX: Setting up PAM data, shape={pam.peak_values.shape}")
         setup_pam_for_tracking(pam)
 
+        # CRITICAL: Extract ALL peak directions from PAM - create multiple streamlines per seed
+        if seed_directions is None:
+            print("EuDX: Extracting all peaks from PAM to generate multiple streamlines per seed")
+            expanded_seeds_list = []
+            seed_directions_list = []
+            original_seed_count = len(seed_positions)  # Store BEFORE processing
+
+            for seed_pos in seed_positions:
+                voxel_pos = np.linalg.inv(affine).dot(np.append(seed_pos, 1))[:3]
+                x, y, z = np.round(voxel_pos).astype(int)
+
+                if (0 <= x < pam.peak_dirs.shape[0] and
+                    0 <= y < pam.peak_dirs.shape[1] and
+                    0 <= z < pam.peak_dirs.shape[2]):
+
+                    # Extract ALL peaks for this voxel (like old LocalTracking)
+                    valid_peaks_found = False
+                    for peak_idx in range(pam.peak_dirs.shape[3]):
+                        peak_dir = pam.peak_dirs[x, y, z, peak_idx]
+                        peak_val = pam.peak_values[x, y, z, peak_idx]
+
+                        # Include peaks above threshold (PAM values are normalized [0,1])
+                        peak_norm = np.linalg.norm(peak_dir)
+                        if peak_norm > 1e-6 and peak_val > 0.01:  # Use 0.01 threshold for PAM values
+                            # Normalize the peak direction
+                            peak_dir_normalized = peak_dir / peak_norm
+                            expanded_seeds_list.append(seed_pos.copy())
+                            seed_directions_list.append(peak_dir_normalized)
+                            valid_peaks_found = True
+
+                    # If no valid peaks found, add one streamline with default direction
+                    if not valid_peaks_found:
+                        expanded_seeds_list.append(seed_pos.copy())
+                        seed_directions_list.append(np.array([1., 0., 0.]))
+                else:
+                    # Outside volume - add default
+                    expanded_seeds_list.append(seed_pos.copy())
+                    seed_directions_list.append(np.array([1., 0., 0.]))
+
+            # Replace original seeds with expanded seeds
+            seed_positions = np.array(expanded_seeds_list)
+            seed_directions = np.array(seed_directions_list)
+
+            print(f"EuDX: Expanded from {original_seed_count} original seeds to {len(expanded_seeds_list)} seed-direction pairs")
+
         # Create a dummy PMF generator for EuDX (it won't be used)
         from dipy.direction.pmf import SimplePmfGen
         dummy_pmf = np.ones((1, 1, 1, len(default_sphere.vertices)))  # 4D array matching expected shape
         dummy_sphere = default_sphere
         pmf_gen = SimplePmfGen(dummy_pmf, dummy_sphere)
-
-        # Remove debug limiting - use real parameters
-        # Restore original min_nbr_pts (was temporarily set to 1 for debugging)
 
         result = generate_tractogram(
             seed_positions,
@@ -116,42 +158,13 @@ def generic_tracking(
                 "seed_directions and seed_directions should have the same shape."
             )
     else:
-        if pam is not None:
-            # Extract peak directions from PAM (your existing code)
-            seed_directions_list = []
-            for seed_pos in seed_positions:
-                voxel_pos = np.linalg.inv(affine).dot(np.append(seed_pos, 1))[:3]
-                x, y, z = np.round(voxel_pos).astype(int)
-                
-                if (0 <= x < pam.peak_dirs.shape[0] and 
-                    0 <= y < pam.peak_dirs.shape[1] and 
-                    0 <= z < pam.peak_dirs.shape[2]):
-                    
-                    peak_dir = pam.peak_dirs[x, y, z, 0]
-                    
-                    if np.linalg.norm(peak_dir) > 0:
-                        seed_directions_list.append(peak_dir)
-                    else:
-                        seed_directions_list.append(np.array([1., 0., 0.]))
-                else:
-                    seed_directions_list.append(np.array([1., 0., 0.]))
-            
-            seed_directions = np.array(seed_directions_list)
-            
-        else:
-            peaks_at_seeds = peaks_from_positions(
-                seed_positions, None, None, npeaks=1, affine=affine, pmf_gen=pmf_gen
-            )
-            seed_positions, seed_directions = seeds_directions_pairs(
-                seed_positions, peaks_at_seeds, max_cross=1
-            )
+        peaks_at_seeds = peaks_from_positions(
+            seed_positions, None, None, npeaks=1, affine=affine, pmf_gen=pmf_gen
+        )
+        seed_positions, seed_directions = seeds_directions_pairs(
+            seed_positions, peaks_at_seeds, max_cross=1
+        )
 
-    # Limit seeds for debugging (for non-PAM case)
-    if len(seed_positions) > 100:
-        print(f"DEBUG: Limiting seeds from {len(seed_positions)} to 100 for debugging")
-        seed_positions = seed_positions[:100]
-        if seed_directions is not None:
-            seed_directions = seed_directions[:100]
 
     # Pass PMF data to generate_tractogram
     return generate_tractogram(
@@ -821,6 +834,11 @@ def eudx_tracking(
         print(f"PAM shape: {pam.peak_values.shape}")
         print(f"PAM peak_dirs shape: {pam.peak_dirs.shape}")
         print(f"Number of seeds: {len(seed_positions)}")
+        # Debug: Check peak value ranges
+        print(f"PAM peak_values range: min={pam.peak_values.min():.6f}, max={pam.peak_values.max():.6f}, mean={pam.peak_values.mean():.6f}")
+        print(f"EuDX Parameters - min_len: {min_len}mm, max_len: {max_len}mm, step_size: {step_size}mm")
+        print(f"EuDX Parameters - min_nbr_pts: {params.min_nbr_pts}, max_nbr_pts: {params.max_nbr_pts}")
+        print(f"EuDX Parameters - max_angle: {max_angle}, return_all: {return_all}")
 
     return generic_tracking(
         seed_positions,
