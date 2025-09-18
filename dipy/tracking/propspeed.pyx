@@ -713,14 +713,12 @@ cdef cnp.npy_intp _eudx_nearest_direction(double* dx,
 
     # Check if we have any peaks
     if num_peaks == 0:
-        global global_eudx_direction_fails
-        global_eudx_direction_fails += 1
         return 0
 
     # Find the peak that best matches current direction
     for i in range(num_peaks):
-        # Skip very low peaks (PAM values are normalized [0,1])
-        if peak_values[i] <= 0.01:  # Very permissive threshold
+        # Skip very weak peaks for better quality
+        if peak_values[i] <= 0.1:  # Quality threshold
             continue
 
         # Get peak direction
@@ -740,8 +738,6 @@ cdef cnp.npy_intp _eudx_nearest_direction(double* dx,
 
     # Check if we found any valid peak
     if not valid_peak_found:
-        global global_eudx_direction_fails
-        global_eudx_direction_fails += 1
         return 0
 
     # Check angular constraint
@@ -758,64 +754,6 @@ cdef cnp.npy_intp _eudx_nearest_direction(double* dx,
     else:
         for j in range(3):
             direction[j] = peak_dir[j]
-
-    return 1
-
-
-cdef cnp.npy_intp _eudx_nearest_direction_optimized(double* dx,
-                                                   double* peak_values,
-                                                   double* peak_dirs,
-                                                   cnp.npy_intp num_peaks,
-                                                   double qa_thr,
-                                                   double ang_thr,
-                                                   double* direction) noexcept nogil:
-    """Optimized EuDX direction selection - no memory copying, direct pointer access"""
-    cdef:
-        double max_dot = 0
-        double angl, curr_dot
-        cnp.npy_intp i, max_idx = 0
-
-    # Early exit for invalid regions (minimal check only)
-    if num_peaks == 0 or peak_values[0] <= qa_thr * 0.05:
-        return 0
-
-    # Calculate angular threshold in radians once
-    angl = cos((DPY_PI * ang_thr) / 180.)
-
-    # Find best matching peak using direct pointer access (loop will be optimized by compiler)
-    for i in range(num_peaks):
-        # Calculate dot product directly from global data
-        curr_dot = (dx[0] * peak_dirs[i * 3] +
-                   dx[1] * peak_dirs[i * 3 + 1] +
-                   dx[2] * peak_dirs[i * 3 + 2])
-
-        # Take absolute value for bidirectional matching
-        if curr_dot < 0:
-            curr_dot = -curr_dot
-
-        # Track best match
-        if curr_dot > max_dot:
-            max_dot = curr_dot
-            max_idx = i
-
-    # Aggressive fallback for failed angular constraint
-    if max_dot < angl and num_peaks > 0 and peak_values[0] > qa_thr * 0.1:
-        max_idx = 0
-        max_dot = 1.0
-
-    # Set output direction with correct sign (direct calculation)
-    curr_dot = (dx[0] * peak_dirs[max_idx * 3] +
-               dx[1] * peak_dirs[max_idx * 3 + 1] +
-               dx[2] * peak_dirs[max_idx * 3 + 2])
-
-    if curr_dot < 0:
-        direction[0] = -peak_dirs[max_idx * 3]
-        direction[1] = -peak_dirs[max_idx * 3 + 1]
-        direction[2] = -peak_dirs[max_idx * 3 + 2]
-    else:
-        direction[0] = peak_dirs[max_idx * 3]
-        direction[1] = peak_dirs[max_idx * 3 + 1]
-        direction[2] = peak_dirs[max_idx * 3 + 2]
 
     return 1
 
@@ -849,11 +787,9 @@ cdef cnp.npy_intp _eudx_propagation_direction(double* point,
     _trilinear_interpolation_iso(point, <double*> w, <cnp.npy_intp*> index)
     
     # Check bounds
-    global global_eudx_bounds_fails
     for i in range(3):
         new_direction[i] = 0
         if index[7 * 3 + i] >= pam_shape[i] or index[i] < 0:
-            global_eudx_bounds_fails += 1
             return 0
     
     # For each neighboring voxel
@@ -885,9 +821,7 @@ cdef cnp.npy_intp _eudx_propagation_direction(double* point,
             new_direction[i] += w[m] * direction[i]
     
     # Check if enough support
-    global global_eudx_weight_fails
     if total_w < total_weight:
-        global_eudx_weight_fails += 1
         return 0
     
     # Normalize result
@@ -899,31 +833,18 @@ cdef cnp.npy_intp _eudx_propagation_direction(double* point,
     return 1
 
 
-cdef int global_eudx_calls = 0
-cdef int global_eudx_successes = 0
-cdef int global_eudx_bounds_fails = 0
-cdef int global_eudx_weight_fails = 0
-cdef int global_eudx_direction_fails = 0
-
 cdef TrackerStatus eudx_propagator(double* point,
                                    double* direction,
                                    TrackerParameters params,
                                    double* stream_data,
                                    PmfGen pmf_gen,
                                    RNGState* rng) noexcept nogil:
-    """EuDX propagator using trilinear interpolation like original implementation"""
-    global global_eudx_calls
-    global global_eudx_successes
-
+    """EuDX propagator using trilinear interpolation"""
     cdef:
         cnp.npy_intp result
-        # PAM peak values are normalized [0,1], not QA values
-        # Use a threshold appropriate for normalized peak strengths
-        double qa_thr = 0.01  # Very low threshold for PAM values
-        double ang_thr = 80.0   # More permissive angular threshold for EuDX
-        double total_weight = 0.3  # Lower weight threshold to allow more streamlines
-
-    global_eudx_calls += 1
+        double qa_thr = 0.1  # Threshold for PAM values [0,1]
+        double ang_thr = 60.0  # Standard angular threshold
+        double total_weight = 0.5  # Standard weight threshold
 
     # Check if PAM data is available
     if global_pam_peak_values == NULL or global_pam_peak_dirs == NULL:
@@ -944,11 +865,7 @@ cdef TrackerStatus eudx_propagator(double* point,
                                         global_pam_shape, global_pam_strides,
                                         direction, total_weight)
 
-    if result:
-        global_eudx_successes += 1
-        return TrackerStatus.SUCCESS
-    else:
-        return TrackerStatus.FAIL
+    return TrackerStatus.SUCCESS if result else TrackerStatus.FAIL
 
 
 cdef TrackerStatus deterministic_propagator(double* point,
@@ -1280,17 +1197,10 @@ def setup_pam_for_tracking(pam):
                     global_pam_peak_dirs[dst_idx + 2] = dirs_ptr[src_idx + 2]
                     dst_idx += 3
 
-    print(f"PAM SETUP: Optimized copy of {total_values_size} values and {total_dirs_size} direction components")
-
 
 def cleanup_pam_tracking():
     """Clean up global PAM data"""
     global global_pam_peak_values, global_pam_peak_dirs
-    global global_eudx_calls, global_eudx_successes
-    global global_eudx_bounds_fails, global_eudx_weight_fails, global_eudx_direction_fails
-
-    print(f"DEBUG: EuDX propagator: {global_eudx_calls} calls, {global_eudx_successes} successes")
-    print(f"DEBUG: Failures - bounds: {global_eudx_bounds_fails}, weight: {global_eudx_weight_fails}, direction: {global_eudx_direction_fails}")
 
     if global_pam_peak_values != NULL:
         free(global_pam_peak_values)
@@ -1299,12 +1209,3 @@ def cleanup_pam_tracking():
     if global_pam_peak_dirs != NULL:
         free(global_pam_peak_dirs)
         global_pam_peak_dirs = NULL
-
-    print("PAM CLEANUP: Global data freed")
-
-    # Reset counters
-    global_eudx_calls = 0
-    global_eudx_successes = 0
-    global_eudx_bounds_fails = 0
-    global_eudx_weight_fails = 0
-    global_eudx_direction_fails = 0

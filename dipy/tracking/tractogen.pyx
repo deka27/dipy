@@ -141,9 +141,6 @@ def generate_tractogram(double[:,::1] seed_positions,
         if seed_end > _len:
             seed_end = _len
 
-    # Print total streamlines generated for debugging
-    print(f"Total streamlines generated: {total_streamlines} from {_len} seeds")
-
     if cleanup_pam:
         from dipy.tracking.propspeed import cleanup_pam_tracking
         cleanup_pam_tracking()  # ← Cleanup AFTER tracking completes
@@ -172,22 +169,8 @@ cdef void generate_tractogram_c(double[:,::1] seed_positions,
     if nbr_threads <= 0:
         nbr_threads = 0
 
-    # Generate tractogram with parallel processing
-    cdef:
-        int valid_streamlines = 0
-        int invalid_streamlines = 0
-        int short_streamlines = 0
-
-    # Track failure reasons
-    cdef:
-        int failed_min_length = 0
-        int failed_tracker = 0
-        int failed_other = 0
-        int failed_norm_check = 0
-        int failed_first_step = 0
-
-    # Temporarily use sequential to debug missing streamlines
-    for i in range(_len):
+    # Process streamlines in parallel
+    for i in prange(_len, nogil=True, num_threads=nbr_threads):
         # Allocate stream buffer (optimized size calculation)
         buffer_size = params.max_nbr_pts * 6 + 1  # 2 directions * 3 coords + 1
         stream = <double*> malloc(buffer_size * sizeof(double))
@@ -228,20 +211,10 @@ cdef void generate_tractogram_c(double[:,::1] seed_positions,
                                                   params,
                                                   pmf_gen)
 
-        # Process streamline result with detailed failure analysis
-        if status[i] == INVALIDSTREAMLIME:
-            # Track why it was invalid
-            failed_min_length += 1
+        # Process streamline result
+        if status[i] == INVALIDSTREAMLIME or stream_idx[1] < stream_idx[0]:
             streamlines[i] = NULL
             lengths[i] = 0
-            invalid_streamlines += 1
-        elif stream_idx[1] < stream_idx[0]:
-            # Invalid indices
-            failed_other += 1
-            streamlines[i] = NULL
-            lengths[i] = 0
-            status[i] = INVALIDSTREAMLIME
-            invalid_streamlines += 1
         else:
             lengths[i] = stream_idx[1] - stream_idx[0] + 1
 
@@ -254,33 +227,19 @@ cdef void generate_tractogram_c(double[:,::1] seed_positions,
                     # Fast memory copy
                     memcpy(streamlines[i], &stream[stream_idx[0] * 3],
                            streamline_size * sizeof(double))
-                    valid_streamlines += 1
                 else:
                     # Handle allocation failure
                     status[i] = INVALIDSTREAMLIME
                     lengths[i] = 0
-                    invalid_streamlines += 1
             else:
                 streamlines[i] = NULL
                 lengths[i] = 0
-                short_streamlines += 1
 
         # Clean up temporary buffers
         free(stream)
         free(stream_idx)
 
-    # Debug output with more detail
-    print(f"EuDX Generation: {valid_streamlines} valid, {invalid_streamlines} invalid, {short_streamlines} short from {_len} seeds")
-    print(f"EuDX Success rate: {valid_streamlines}/{_len} = {100.0 * valid_streamlines / _len:.1f}%")
-    if invalid_streamlines > valid_streamlines:
-        print(f"WARNING: High failure rate suggests tracking parameters may be too restrictive")
-
-    # Additional analysis
-    if _len > 0:
-        avg_expansion = <double>_len / <double>(735067)  # hardcoded for now
-        avg_success_per_original = <double>valid_streamlines / <double>(735067)
-        print(f"Average expansion: {avg_expansion:.2f}x, Success per original seed: {avg_success_per_original:.2f}x")
-        print(f"Failure reasons: min_length={failed_min_length}, other={failed_other}")
+    # Generation complete
 
 
 cdef StreamlineStatus generate_local_streamline(double* seed,

@@ -43,15 +43,13 @@ def generic_tracking(
 
     # Handle PAM object for EuDX
     if pam is not None:
-        print(f"EuDX: Setting up PAM data, shape={pam.peak_values.shape}")
         setup_pam_for_tracking(pam)
 
-        # CRITICAL: Extract ALL peak directions from PAM - create multiple streamlines per seed
+        # Extract ALL peak directions from PAM - create multiple streamlines per seed
         if seed_directions is None:
-            print("EuDX: Extracting all peaks from PAM to generate multiple streamlines per seed")
             expanded_seeds_list = []
             seed_directions_list = []
-            original_seed_count = len(seed_positions)  # Store BEFORE processing
+            original_seed_count = len(seed_positions)
 
             for seed_pos in seed_positions:
                 voxel_pos = np.linalg.inv(affine).dot(np.append(seed_pos, 1))[:3]
@@ -69,7 +67,7 @@ def generic_tracking(
 
                         # Include peaks above threshold (PAM values are normalized [0,1])
                         peak_norm = np.linalg.norm(peak_dir)
-                        if peak_norm > 1e-6 and peak_val > 0.01:  # Use 0.01 threshold for PAM values
+                        if peak_norm > 1e-6 and peak_val > 0.02:  # Quality threshold
                             # Normalize the peak direction
                             peak_dir_normalized = peak_dir / peak_norm
                             expanded_seeds_list.append(seed_pos.copy())
@@ -89,7 +87,7 @@ def generic_tracking(
             seed_positions = np.array(expanded_seeds_list)
             seed_directions = np.array(seed_directions_list)
 
-            print(f"EuDX: Expanded from {original_seed_count} original seeds to {len(expanded_seeds_list)} seed-direction pairs")
+            # Expansion complete
 
         # Create a dummy PMF generator for EuDX (it won't be used)
         from dipy.direction.pmf import SimplePmfGen
@@ -828,17 +826,6 @@ def eudx_tracking(
         random_seed=random_seed,
         return_all=return_all,
     )
-
-    # Add some debugging
-    if pam is not None:
-        print(f"PAM shape: {pam.peak_values.shape}")
-        print(f"PAM peak_dirs shape: {pam.peak_dirs.shape}")
-        print(f"Number of seeds: {len(seed_positions)}")
-        # Debug: Check peak value ranges
-        print(f"PAM peak_values range: min={pam.peak_values.min():.6f}, max={pam.peak_values.max():.6f}, mean={pam.peak_values.mean():.6f}")
-        print(f"EuDX Parameters - min_len: {min_len}mm, max_len: {max_len}mm, step_size: {step_size}mm")
-        print(f"EuDX Parameters - min_nbr_pts: {params.min_nbr_pts}, max_nbr_pts: {params.max_nbr_pts}")
-        print(f"EuDX Parameters - max_angle: {max_angle}, return_all: {return_all}")
 
     return generic_tracking(
         seed_positions,
