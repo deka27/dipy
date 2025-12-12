@@ -1,4 +1,4 @@
-from nibabel.affines import voxel_sizes
+from nibabel.affines import apply_affine, voxel_sizes
 import numpy as np
 
 from dipy.data import default_sphere
@@ -728,6 +728,9 @@ def eudx_tracking(
     step_size=0.5,
     voxel_size=None,
     max_angle=60,
+    qa_thr=0.0239,
+    ang_thr=60,
+    total_weight=0.5,
     pmf_threshold=0.1,
     sphere=None,
     basis_type=None,
@@ -738,8 +741,10 @@ def eudx_tracking(
     return_all=True,
     save_seeds=False,
 ):
-    """EuDX tracking algorithm.
+    """EuDX tracking algorithm with parallel support.
 
+    Parameters
+    ----------
     seed_positions : ndarray
         Seed positions in world space.
     sc : StoppingCriterion
@@ -749,77 +754,172 @@ def eudx_tracking(
     seed_directions : ndarray, optional
         Seed directions.
     sh : ndarray, optional
-        Spherical Harmonics (SH).
+        Spherical Harmonics (SH). Not used for EuDX.
     peaks : ndarray, optional
-        Peaks array.
+        Peaks array. Not used for EuDX.
     sf : ndarray, optional
-        Spherical Function (SF).
+        Spherical Function (SF). Not used for EuDX.
     pam : PeakAndMetrics, optional
-        Peaks and Metrics object
+        Peaks and Metrics object containing peak_values, peak_indices, and sphere.
+        Required for EuDX tracking.
     min_len : int, optional
-        Minimum length (mm) of the streamlines.
+        Minimum length (mm) of the streamlines. Default: 2
     max_len : int, optional
-        Maximum length (mm) of the streamlines.
+        Maximum length (mm) of the streamlines. Default: 500
     step_size : float, optional
-        Step size of the tracking.
+        Step size of the tracking. Default: 0.5
     voxel_size : ndarray, optional
-        Voxel size.
+        Voxel size. If None, extracted from affine.
     max_angle : float, optional
-        Maximum angle.
+        Maximum angle. Deprecated for EuDX, use ang_thr instead.
+    qa_thr : float, optional
+        QA threshold for peak selection. Peaks below this are ignored.
+        Default: 0.0239
+    ang_thr : float, optional
+        Angular threshold in degrees. Maximum angle between consecutive
+        directions. Default: 60
+    total_weight : float, optional
+        Minimum total interpolation weight to continue tracking.
+        Default: 0.5 (requires >50% interpolation weight)
     pmf_threshold : float, optional
-        PMF threshold.
+        PMF threshold. Not used for EuDX.
     sphere : Sphere, optional
-        Sphere.
-    basis_type : name of basis
-        The basis that ``shcoeff`` are associated with.
-        ``dipy.reconst.shm.real_sh_descoteaux`` is used by default.
+        Sphere. Not used if pam is provided (pam.sphere is used).
+    basis_type : str, optional
+        The basis that ``shcoeff`` are associated with. Not used for EuDX.
     legacy: bool, optional
-        True to use a legacy basis definition for backward compatibility
-        with previous ``tournier07`` and ``descoteaux07`` implementations.
+        Legacy basis definition. Not used for EuDX.
     nbr_threads: int, optional
-        Number of threads to use for the processing. By default, all available threads
-        will be used.
+        Number of threads to use for parallel processing. 0 = use all available
+        threads. Default: 0
     random_seed: int, optional
-        Seed for the random number generator, must be >= 0. A value of greater than 0
-        will all produce the same streamline trajectory for a given seed coordinate.
-        A value of 0 may produces various streamline tracjectories for a given seed
-        coordinate.
+        Seed for the random number generator, must be >= 0. Note: EuDX is
+        deterministic, so random_seed only affects initial direction selection.
+        Default: 0
     seed_buffer_fraction: float, optional
-        Fraction of the seed buffer to use. A value of 1.0 will use the entire seed
-        buffer. A value of 0.5 will use half of the seed buffer then the other half.
-        a way to reduce memory usage.
+        Fraction of the seed buffer to process at once. A value of 1.0 will
+        process all seeds. A value of 0.5 will process half at a time.
+        Useful for reducing memory usage. Default: 1.0
     return_all: bool, optional
-        True to return all the streamlines, False to return only the streamlines that
-        reached the stopping criterion.
+        True to return all the streamlines, False to return only the streamlines
+        that reached valid endpoints. Default: True
     save_seeds: bool, optional
-        True to return the seeds with the associated streamline.
+        True to return the seeds alongside streamlines. Default: False
 
     Returns
     -------
     Tractogram
+        Generator yielding streamlines (and optionally seeds).
+
+    Notes
+    -----
+    This implementation uses parallel processing via OpenMP. The number of
+    threads can be controlled with nbr_threads parameter.
+
+    EuDX is a deterministic algorithm that works with discrete peaks rather
+    than probability distributions. It interpolates peak directions and
+    selects the peak closest to the current tracking direction.
 
     """
-    sphere = sphere if sphere is not None else default_sphere
+    from dipy.tracking.peak_tracker import generate_tractogram_eudx
+
     if pam is None:
-        raise ValueError("PAM should be defined.")
+        raise ValueError("PAM (PeaksAndMetrics) object is required for EuDX tracking.")
 
-    # convert length in mm to number of points
-    min_len = int(min_len / step_size)
-    max_len = int(max_len / step_size)
+    # Validate PAM has required attributes
+    if not hasattr(pam, 'peak_values') or not hasattr(pam, 'peak_indices'):
+        raise ValueError("PAM object must have 'peak_values' and 'peak_indices' attributes.")
+    if not hasattr(pam, 'sphere'):
+        sphere = sphere if sphere is not None else default_sphere
+        if sphere is None:
+            raise ValueError("Either pam.sphere or sphere parameter must be provided.")
+    else:
+        sphere = pam.sphere
 
-    return LocalTracking(
-        pam,
-        sc,
-        seed_positions,
-        affine,
+    # Get voxel size from affine if not provided
+    voxel_size = voxel_size if voxel_size is not None else voxel_sizes(affine)
+
+    # Ensure seed_positions is the correct shape and type
+    seed_positions = np.asarray(seed_positions, dtype=np.float64)
+    if seed_positions.ndim != 2 or seed_positions.shape[1] != 3:
+        raise ValueError("seed_positions must be shape (N, 3)")
+
+    # Ensure we have proper array types (needed for seed direction generation)
+    qa = np.ascontiguousarray(pam.peak_values, dtype=np.float64)
+    ind = np.ascontiguousarray(pam.peak_indices, dtype=np.float64)
+    odf_vertices = np.ascontiguousarray(sphere.vertices, dtype=np.float64)
+    voxel_size = np.ascontiguousarray(voxel_size, dtype=np.float64)
+
+    # Handle initial seed directions
+    if seed_directions is None:
+        # Get initial directions from peaks at seed locations
+        # Transform seeds to voxel coordinates
+        inv_affine = np.linalg.inv(affine)
+        seed_voxels = apply_affine(inv_affine, seed_positions)
+
+        # Get direction from the highest peak at each seed location
+        seed_directions_list = []
+        valid_seeds = []
+
+        for seed_idx, seed_vox in enumerate(seed_voxels):
+            # Round to nearest voxel
+            i, j, k = np.round(seed_vox).astype(int)
+
+            # Check bounds
+            if (0 <= i < qa.shape[0] and
+                0 <= j < qa.shape[1] and
+                0 <= k < qa.shape[2]):
+
+                # Get ALL peaks with QA > 0 (like old EuDX implementation)
+                # This generates multiple streamlines per seed, one for each valid peak
+                for peak_num in range(qa.shape[3]):  # Iterate through all peaks
+                    peak_qa = qa[i, j, k, peak_num]
+                    if peak_qa > 0:  # Valid peak
+                        peak_idx = int(ind[i, j, k, peak_num])
+                        direction = odf_vertices[peak_idx]
+                        seed_directions_list.append(direction)
+                        valid_seeds.append(seed_positions[seed_idx])
+                    else:
+                        break  # Peaks are sorted, so no more valid peaks
+
+        if len(valid_seeds) == 0:
+            raise ValueError("No valid seeds found - all seeds outside volume bounds")
+
+        seed_positions = np.array(valid_seeds, dtype=np.float64)
+        seed_directions = np.array(seed_directions_list, dtype=np.float64)
+    else:
+        seed_directions = np.asarray(seed_directions, dtype=np.float64)
+        if seed_directions.shape != seed_positions.shape:
+            raise ValueError(
+                f"seed_directions shape {seed_directions.shape} must match "
+                f"seed_positions shape {seed_positions.shape}"
+            )
+
+    # Call parallel EuDX tractogram generator
+    streamline_generator = generate_tractogram_eudx(
+        seed_positions=seed_positions,
+        seed_directions=seed_directions,
+        sc=sc,
+        qa=qa,
+        ind=ind,
+        odf_vertices=odf_vertices,
+        affine=affine,
+        max_len=max_len,
+        min_len=min_len,
         step_size=step_size,
-        minlen=min_len,
-        maxlen=max_len,
-        random_seed=random_seed,
-        return_all=return_all,
-        initial_directions=seed_directions,
+        voxel_size=voxel_size,
+        qa_thr=qa_thr,
+        ang_thr=ang_thr,
+        total_weight=total_weight,
+        nbr_threads=nbr_threads,
+        buffer_frac=seed_buffer_fraction,
         save_seeds=save_seeds,
+        return_all=return_all,
     )
+
+    # Yield streamlines from generator
+    for streamline_data in streamline_generator:
+        yield streamline_data
 
 
 def pft_tracking(
