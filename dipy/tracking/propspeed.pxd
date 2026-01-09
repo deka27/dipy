@@ -1,5 +1,6 @@
 cimport numpy as cnp
 
+from dipy.direction.peak_direction cimport PeakDirectionGen
 from dipy.direction.pmf cimport PmfGen
 from dipy.tracking.tracker_parameters cimport TrackerParameters, TrackerStatus
 from dipy.utils.fast_numpy cimport RNGState
@@ -27,6 +28,13 @@ cdef TrackerStatus parallel_transport_propagator(double* point,
                                                  PmfGen pmf_gen,
                                                  RNGState* rng) noexcept nogil
 
+
+cdef TrackerStatus glide_propagator(double* point,
+                                     double* direction,
+                                     TrackerParameters params,
+                                     double* stream_data,
+                                     PeakDirectionGen peak_gen,
+                                     RNGState* rng) noexcept nogil
 
 
 cdef cnp.npy_intp _propagation_direction(double *point, double* prev, double* qa,

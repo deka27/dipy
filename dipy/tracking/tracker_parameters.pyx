@@ -18,7 +18,8 @@ def generate_tracking_parameters(algo_name, *,
     int max_len=500, int min_len=2, double step_size=0.2, double[:] voxel_size,
     double max_angle=20, bint return_all=True, double pmf_threshold=0.1,
     double probe_length=0.5, double probe_radius=0, int probe_quality=3,
-    int probe_count=1, double data_support_exponent=1, int random_seed=0):
+    int probe_count=1, double data_support_exponent=1, int random_seed=0,
+    double strength_threshold=0.02, double interpolation_threshold=0.5):
 
     cdef TrackerParameters params
 
@@ -62,6 +63,22 @@ def generate_tracking_parameters(algo_name, *,
                                    return_all=return_all)
         params.set_tracker_c(parallel_transport_propagator)
         return params
+    elif algo_name == 'glide':
+        params = TrackerParameters(max_len=max_len,
+                                   min_len=min_len,
+                                   step_size=step_size,
+                                   voxel_size=voxel_size,
+                                   max_angle=max_angle,
+                                   random_seed=random_seed,
+                                   return_all=return_all)
+        params.glide = GlideTrackerParameters(
+            strength_threshold=strength_threshold,
+            interpolation_threshold=interpolation_threshold
+        )
+        # Note: We don't set tracker function pointer for glide because
+        # glide_propagator is called directly in generate_local_streamline_glide
+        # to avoid type mismatch between PeakDirectionGen and PmfGen
+        return params
     else:
         raise ValueError("Invalid algorithm name")
 
@@ -93,6 +110,7 @@ cdef class TrackerParameters:
 
         self.sh = None
         self.ptt = None
+        self.glide = None
 
         if pmf_threshold is not None:
             self.sh = ShTrackerParameters(pmf_threshold)
@@ -108,6 +126,14 @@ cdef class ShTrackerParameters:
 
     def __init__(self, pmf_threshold):
         self.pmf_threshold = pmf_threshold
+
+
+cdef class GlideTrackerParameters:
+
+    def __init__(self, double strength_threshold, double interpolation_threshold):
+        self.strength_threshold = strength_threshold
+        self.interpolation_threshold = interpolation_threshold
+
 
 cdef class ParallelTransportTrackerParameters:
 

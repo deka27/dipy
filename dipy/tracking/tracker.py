@@ -5,13 +5,14 @@ from dipy.data import default_sphere
 from dipy.direction import (
     BootDirectionGetter,
     ClosestPeakDirectionGetter,
+    PeakDirectionGen,
     ProbabilisticDirectionGetter,
 )
 from dipy.direction.peaks import peaks_from_positions
 from dipy.direction.pmf import SHCoeffPmfGen, SimplePmfGen
 from dipy.tracking.local_tracking import LocalTracking, ParticleFilteringTracking
 from dipy.tracking.tracker_parameters import generate_tracking_parameters
-from dipy.tracking.tractogen import generate_tractogram
+from dipy.tracking.tractogen import generate_tractogram, generate_tractogram_glide
 from dipy.tracking.utils import seeds_directions_pairs
 
 
@@ -979,4 +980,251 @@ def pft_tracking(
         min_wm_pve_before_stopping=min_wm_pve_before_stopping,
         unidirectional=unidirectional,
         randomize_forward_direction=randomize_forward_direction,
+    )
+
+
+def _extract_seed_directions_from_peaks(
+    seed_positions, peak_directions, peak_values, affine, strength_threshold
+):
+    """Extract initial tracking directions from peaks at seed positions.
+
+    Parameters
+    ----------
+    seed_positions : ndarray, shape (N, 3)
+        Seed positions in world coordinates.
+    peak_directions : ndarray, shape (X, Y, Z, npeaks, 3)
+        Peak directions as 3D unit vectors.
+    peak_values : ndarray, shape (X, Y, Z, npeaks)
+        Peak strength values.
+    affine : ndarray, shape (4, 4)
+        Affine transformation from world to voxel coordinates.
+    strength_threshold : float
+        Minimum peak strength to consider.
+
+    Returns
+    -------
+    seed_directions : ndarray, shape (N, 3)
+        Initial directions for each seed.
+    """
+    import numpy as np
+    from nibabel.affines import apply_affine
+
+    # Transform seeds to voxel coordinates
+    inv_affine = np.linalg.inv(affine)
+    seed_voxels = apply_affine(inv_affine, seed_positions)
+
+    N = len(seed_positions)
+    npeaks = peak_directions.shape[3]
+    seed_directions = np.zeros((N, 3), dtype=float)
+
+    for i in range(N):
+        # Get voxel indices (round to nearest voxel)
+        x = int(np.round(seed_voxels[i, 0]))
+        y = int(np.round(seed_voxels[i, 1]))
+        z = int(np.round(seed_voxels[i, 2]))
+
+        # Check bounds
+        if (
+            x < 0
+            or x >= peak_directions.shape[0]
+            or y < 0
+            or y >= peak_directions.shape[1]
+            or z < 0
+            or z >= peak_directions.shape[2]
+        ):
+            # Outside volume - use default direction
+            seed_directions[i] = [1.0, 0.0, 0.0]
+            continue
+
+        # Find strongest peak above threshold
+        max_val = -1
+        max_idx = -1
+        for p in range(npeaks):
+            if peak_values[x, y, z, p] > max_val and peak_values[x, y, z, p] >= strength_threshold:
+                max_val = peak_values[x, y, z, p]
+                max_idx = p
+
+        if max_idx >= 0:
+            # Use strongest peak direction (normalize it!)
+            peak_dir = peak_directions[x, y, z, max_idx]
+            norm = np.linalg.norm(peak_dir)
+            if norm > 1e-10:
+                seed_directions[i] = peak_dir / norm
+            else:
+                seed_directions[i] = [1.0, 0.0, 0.0]
+        else:
+            # No valid peak - use default direction
+            seed_directions[i] = [1.0, 0.0, 0.0]
+
+    return seed_directions
+
+
+def glide_tracking(
+    seed_positions,
+    sc,
+    affine,
+    *,
+    seed_directions=None,
+    peak_directions,
+    peak_values,
+    min_len=2,
+    max_len=500,
+    step_size=0.5,
+    voxel_size=None,
+    max_angle=60,
+    strength_threshold=0.02,
+    interpolation_threshold=0.5,
+    nbr_threads=0,
+    random_seed=0,
+    buffer_frac=1.0,
+    return_all=True,
+    save_seeds=False,
+):
+    """Glide tracking - parallelized peak-based deterministic tracking.
+
+    Glide tracking uses the EUDX trilinear interpolation principle with
+    direct storage of 3D peak directions for efficient parallelized tracking.
+    It follows the same deterministic propagation strategy as EUDX but with
+    optimizations for modern multi-core processors.
+
+    Parameters
+    ----------
+    seed_positions : ndarray, shape (N, 3)
+        Seed positions for streamlines in world coordinates.
+    sc : StoppingCriterion
+        Stopping criterion object that determines when tracking should stop.
+    affine : ndarray, shape (4, 4)
+        Affine transformation from world to voxel coordinates.
+    seed_directions : ndarray, shape (N, 3), optional
+        Initial tracking directions for each seed. If None, directions are
+        extracted from the strongest peaks at seed locations.
+    peak_directions : ndarray, shape (X, Y, Z, npeaks, 3)
+        Peak directions as 3D unit vectors at each voxel.
+    peak_values : ndarray, shape (X, Y, Z, npeaks)
+        Peak strength values (e.g., QA, GFA) at each voxel.
+    min_len : float, optional
+        Minimum streamline length in mm. Default: 2.
+    max_len : float, optional
+        Maximum streamline length in mm. Default: 500.
+    step_size : float, optional
+        Step size for tracking in mm. Default: 0.5.
+    voxel_size : ndarray, shape (3,), optional
+        Voxel size in mm. If None, extracted from affine.
+    max_angle : float, optional
+        Maximum angle in degrees between successive tracking steps. Default: 60.
+    strength_threshold : float, optional
+        Minimum peak strength to consider during tracking. Peaks below this
+        value are ignored. Default: 0.02.
+    interpolation_threshold : float, optional
+        Minimum interpolation weight fraction to continue tracking. Tracking
+        stops if less than this fraction of neighboring voxels contribute
+        valid directions. Default: 0.5.
+    nbr_threads : int, optional
+        Number of threads for parallel tracking. 0 uses all available cores.
+        Default: 0.
+    random_seed : int, optional
+        Random seed for reproducible tracking. Default: 0.
+    buffer_frac : float, optional
+        Fraction of seeds to process in each batch (0 < buffer_frac <= 1).
+        Lower values use less memory. Default: 1.0.
+    return_all : bool, optional
+        If True, return all streamlines including invalid ones. Default: True.
+    save_seeds : bool, optional
+        If True, yield (streamline, seed) pairs. If False, yield only
+        streamlines. Default: False.
+
+    Yields
+    ------
+    streamlines : ndarray, shape (N_points, 3)
+        Generated streamlines in world coordinates.
+    seeds : ndarray, shape (3,), optional
+        Seed position for each streamline (only if save_seeds=True).
+
+    Examples
+    --------
+    >>> from dipy.tracking import tracker
+    >>> from dipy.tracking.stopping_criterion import ThresholdStoppingCriterion
+    >>> # Assume we have peak_dirs and peak_vals from peak detection
+    >>> seeds = np.array([[30, 30, 30], [31, 31, 31]])  # in voxel coords
+    >>> sc = ThresholdStoppingCriterion(fa_map, 0.2)
+    >>> streamlines = tracker.glide_tracking(
+    ...     seeds, sc, affine,
+    ...     peak_directions=peak_dirs,
+    ...     peak_values=peak_vals
+    ... )
+    >>> streamlines_list = list(streamlines)
+
+    Notes
+    -----
+    Glide tracking implements the same trilinear interpolation principle as
+    EUDX [1]_, but with several optimizations:
+
+    - Direct storage of 3D peak directions (no sphere index lookup)
+    - Modern OpenMP-based parallelization via tractogen framework
+    - New parameter names for clarity (strength_threshold, interpolation_threshold)
+
+    The tracking stops when:
+    - Peak strength < strength_threshold
+    - Angle between steps > max_angle
+    - Interpolation weight < interpolation_threshold
+    - Stopping criterion is met
+
+    References
+    ----------
+    .. [1] Garyfallidis E., "Towards an accurate brain tractography", PhD
+           thesis, University of Cambridge, 2012.
+    """
+    # Validate inputs
+    peak_directions = np.asarray(peak_directions, dtype=float, order="C")
+    peak_values = np.asarray(peak_values, dtype=float, order="C")
+
+    if peak_directions.ndim != 5 or peak_directions.shape[-1] != 3:
+        raise ValueError("peak_directions must be shape (X,Y,Z,npeaks,3)")
+    if peak_values.ndim != 4:
+        raise ValueError("peak_values must be shape (X,Y,Z,npeaks)")
+    if peak_directions.shape[:4] != peak_values.shape:
+        raise ValueError("peak_directions and peak_values must have matching spatial and peak dimensions")
+
+    # Get voxel size from affine if not provided
+    if voxel_size is None:
+        voxel_size = voxel_sizes(affine)
+
+    # Create tracking parameters with glide propagator
+    params = generate_tracking_parameters(
+        "glide",
+        min_len=min_len,
+        max_len=max_len,
+        step_size=step_size,
+        voxel_size=voxel_size,
+        max_angle=max_angle,
+        strength_threshold=strength_threshold,
+        interpolation_threshold=interpolation_threshold,
+        random_seed=random_seed,
+        return_all=return_all,
+    )
+
+    # Create PeakDirectionGen data container
+    peak_gen = PeakDirectionGen(peak_directions, peak_values)
+
+    # Handle seed directions
+    if seed_directions is None:
+        # Extract initial directions from peaks at seed locations
+        seed_directions = _extract_seed_directions_from_peaks(
+            seed_positions, peak_directions, peak_values, affine, strength_threshold
+        )
+
+    # Ensure seed_directions is properly formatted
+    seed_directions = np.asarray(seed_directions, dtype=float, order="C")
+
+    # Call glide-specific tractogen function
+    return generate_tractogram_glide(
+        seed_positions,
+        seed_directions,
+        sc,
+        params,
+        peak_gen,
+        affine=affine,
+        nbr_threads=nbr_threads,
+        buffer_frac=buffer_frac,
+        save_seeds=save_seeds,
     )

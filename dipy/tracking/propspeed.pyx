@@ -950,3 +950,184 @@ cdef TrackerStatus parallel_transport_propagator(double* point,
             return TrackerStatus.SUCCESS
 
     return TrackerStatus.FAIL
+
+
+cdef TrackerStatus glide_propagator(double* point,
+                                     double* direction,
+                                     TrackerParameters params,
+                                     double* stream_data,
+                                     PeakDirectionGen peak_gen,
+                                     RNGState* rng) noexcept nogil:
+    """
+    Glide propagator - EUDX-style trilinear interpolation on peak directions.
+
+    Uses trilinear interpolation of peak directions from 8 neighboring voxels,
+    weighted by interpolation weights. Tracks deterministically by selecting
+    directions that pass strength and angle thresholds.
+
+    Parameters
+    ----------
+    point : double[3]
+        Current tracking position in voxel coordinates.
+    direction : double[3]
+        Previous tracking direction (input) and next direction (output).
+    params : TrackerParameters
+        Tracking parameters including glide-specific thresholds.
+    stream_data : double*
+        Streamline data persistent across tracking steps (unused for glide).
+    peak_gen : PeakDirectionGen
+        Peak direction data container with trilinear interpolation support.
+    rng : RNGState*
+        Random number generator state (thread safe, unused for glide).
+
+    Returns
+    -------
+    status : TrackerStatus
+        Returns SUCCESS if propagation was successful, FAIL otherwise.
+    """
+    cdef:
+        cnp.npy_intp max_peaks = 5  # Maximum peaks per voxel
+        cnp.npy_intp total_entries = 8 * max_peaks
+        cnp.npy_intp i, m, peak_idx, entry_idx, best_peak_idx
+        double cos_sim, cos_sim_abs
+        double total_weight = 0.0
+        double weighted_dir[3]
+        double norm_val
+        double peak_dir[3]
+        double peak_val
+        double interp_weight
+        double best_cos_sim
+        # Allocate arrays for interpolated data from 8 neighbors
+        double* interp_dirs = <double*> malloc(total_entries * 3 * sizeof(double))
+        double* interp_values = <double*> malloc(total_entries * sizeof(double))
+        double* interp_weights = <double*> malloc(8 * sizeof(double))
+
+    # Check if direction is valid
+    if norm(direction) == 0:
+        free(interp_dirs)
+        free(interp_values)
+        free(interp_weights)
+        return TrackerStatus.FAIL
+
+    # Normalize input direction
+    normalize(direction)
+
+    # Get interpolated peak data from 8 neighboring voxels
+    peak_gen.get_peak_directions_c(point, interp_dirs, interp_values,
+                                   interp_weights, max_peaks)
+
+    # Initialize weighted direction accumulator
+    for i in range(3):
+        weighted_dir[i] = 0.0
+
+    # Process each peak from each of the 8 neighbors
+    for m in range(8):  # 8 neighboring voxels
+        interp_weight = interp_weights[m]
+
+        # Skip if weight is too small
+        if interp_weight < 1e-10:
+            continue
+
+        # Find the BEST peak from this neighbor (like EUDX _nearest_direction)
+        # Best = highest cosine similarity (smallest angle) that passes thresholds
+        best_cos_sim = -1.0
+        best_peak_idx = -1
+
+        for peak_idx in range(max_peaks):
+            entry_idx = m * max_peaks + peak_idx
+
+            # Get peak value
+            peak_val = interp_values[entry_idx]
+
+            # Check strength threshold
+            if peak_val < params.glide.strength_threshold:
+                continue
+
+            # Get peak direction
+            for i in range(3):
+                peak_dir[i] = interp_dirs[entry_idx * 3 + i]
+
+            # Normalize peak direction (they may not be unit vectors)
+            norm_val = sqrt(peak_dir[0] * peak_dir[0] +
+                           peak_dir[1] * peak_dir[1] +
+                           peak_dir[2] * peak_dir[2])
+
+            if norm_val < 1e-10:
+                continue  # Skip zero/invalid directions
+
+            for i in range(3):
+                peak_dir[i] = peak_dir[i] / norm_val
+
+            # Compute cosine similarity with current direction
+            cos_sim = (peak_dir[0] * direction[0] +
+                      peak_dir[1] * direction[1] +
+                      peak_dir[2] * direction[2])
+
+            # Use absolute value for angle check (direction can be flipped)
+            cos_sim_abs = cos_sim if cos_sim > 0 else -cos_sim
+
+            # Check angle threshold (cos_similarity = cos(max_angle))
+            if cos_sim_abs < params.cos_similarity:
+                continue
+
+            # This peak passes both thresholds - check if it's the best so far
+            if cos_sim_abs > best_cos_sim:
+                best_cos_sim = cos_sim_abs
+                best_peak_idx = peak_idx
+
+        # If we found a valid peak, use it (only the best one)
+        if best_peak_idx >= 0:
+            entry_idx = m * max_peaks + best_peak_idx
+
+            # Get the best peak direction
+            for i in range(3):
+                peak_dir[i] = interp_dirs[entry_idx * 3 + i]
+
+            # Normalize the peak direction (CRITICAL: must normalize before accumulating!)
+            norm_val = sqrt(peak_dir[0] * peak_dir[0] +
+                           peak_dir[1] * peak_dir[1] +
+                           peak_dir[2] * peak_dir[2])
+
+            if norm_val < 1e-10:
+                continue  # Skip invalid directions
+
+            for i in range(3):
+                peak_dir[i] = peak_dir[i] / norm_val
+
+            # Compute cosine similarity to determine sign
+            cos_sim = (peak_dir[0] * direction[0] +
+                      peak_dir[1] * direction[1] +
+                      peak_dir[2] * direction[2])
+
+            # Add weighted direction (flip if needed for continuity)
+            if cos_sim < 0:
+                for i in range(3):
+                    weighted_dir[i] += interp_weight * (-peak_dir[i])
+            else:
+                for i in range(3):
+                    weighted_dir[i] += interp_weight * peak_dir[i]
+
+            total_weight += interp_weight
+
+    # Free allocated memory
+    free(interp_dirs)
+    free(interp_values)
+    free(interp_weights)
+
+    # Check if we have sufficient interpolation support
+    if total_weight < params.glide.interpolation_threshold:
+        return TrackerStatus.FAIL
+
+    # Normalize weighted direction to get next direction
+    norm_val = sqrt(weighted_dir[0] * weighted_dir[0] +
+                   weighted_dir[1] * weighted_dir[1] +
+                   weighted_dir[2] * weighted_dir[2])
+
+    if norm_val < 1e-10:
+        return TrackerStatus.FAIL
+
+    # Update direction with normalized weighted direction
+    for i in range(3):
+        direction[i] = weighted_dir[i] / norm_val
+
+    return TrackerStatus.SUCCESS

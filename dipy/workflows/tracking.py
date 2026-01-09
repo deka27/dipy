@@ -16,6 +16,7 @@ from dipy.tracking.tracker import (
     closestpeak_tracking,
     deterministic_tracking,
     eudx_tracking,
+    glide_tracking,
     pft_tracking,
     probabilistic_tracking,
     ptt_tracking,
@@ -92,6 +93,7 @@ class LocalFiberTrackingPAMFlow(Workflow):
                 - "probabilistic" or "prob" for a Probabilistic tracking
                 - "closestpeaks" or "cp" for a ClosestPeaks tracking
                 - "ptt" for Parallel Transport Tractography
+                - "glide" for parallelized peak-based deterministic tracking
 
             By default, the sh coefficients saved in the pam_files are used.
         pmf_threshold : float, optional
@@ -136,6 +138,8 @@ class LocalFiberTrackingPAMFlow(Workflow):
         for pams_path, stopping_path, seeding_path, out_tract in io_it:
             if tracking_method == "eudx":
                 logger.info(f"EuDX Deterministic tracking on {pams_path}")
+            elif tracking_method == "glide":
+                logger.info(f"Glide (Parallelized Peak-Based) tracking on {pams_path}")
             else:
                 logger.info(f"{tracking_method.title()} tracking on {pams_path}")
 
@@ -244,11 +248,29 @@ class LocalFiberTrackingPAMFlow(Workflow):
                     nbr_threads=nbr_threads,
                     seed_buffer_fraction=seed_buffer_fraction,
                 )
+            elif tracking_method in ["glide"]:
+                tracking_result = glide_tracking(
+                    seeds,
+                    stopping_criterion,
+                    affine,
+                    peak_directions=pam.peak_dirs,
+                    peak_values=pam.peak_values,
+                    random_seed=random_seed,
+                    max_angle=max_angle,
+                    min_len=minlen,
+                    max_len=maxlen,
+                    step_size=step_size,
+                    strength_threshold=0.0239,
+                    interpolation_threshold=0.5,
+                    save_seeds=save_seeds,
+                    nbr_threads=nbr_threads,
+                    buffer_frac=seed_buffer_fraction,
+                )
             else:
                 logger.error(
                     f"Unknown tracking method: {tracking_method}. "
                     f"Please use one of the following: "
-                    f"'eudx', 'deterministic', 'probabilistic', 'closestpeaks', 'ptt'"
+                    f"'eudx', 'deterministic', 'probabilistic', 'closestpeaks', 'ptt', 'glide'"
                 )
                 sys.exit(1)
             if save_seeds:

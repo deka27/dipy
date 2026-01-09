@@ -29,6 +29,10 @@ cdef class ParallelTransportTrackerParameters:
 cdef class ShTrackerParameters:
     cdef public double pmf_threshold
 
+cdef class GlideTrackerParameters:
+    cdef public double strength_threshold
+    cdef public double interpolation_threshold
+
 cdef class TrackerParameters:
     cdef func_ptr tracker
 
@@ -46,5 +50,6 @@ cdef class TrackerParameters:
 
     cdef public ShTrackerParameters sh
     cdef public ParallelTransportTrackerParameters ptt
+    cdef public GlideTrackerParameters glide
 
     cdef void set_tracker_c(self, func_ptr tracker) noexcept nogil
