@@ -34,6 +34,29 @@ cdef class EudxTrackerParameters:
     cdef public double angle_threshold
     cdef public double min_total_weight
 
+cdef class GlideTrackerParameters:
+    cdef public double cos_sim_min
+    cdef public double cos_sim_max
+    cdef public double pmf_threshold
+    cdef public double sharpness_power
+    cdef public int blend_mode
+    cdef public double sigmoid_steepness
+    cdef public double sigmoid_midpoint
+    cdef public bint has_gm_map
+    cdef public double gm_transition_low
+    cdef public double gm_transition_high
+    cdef public double gm_relaxation_factor
+    cdef public double[:,:,:] uncertainty_data
+    cdef public double[:,:,:] gm_data
+    cdef public bint has_dispersion_map
+    cdef public double[:,:,:] dispersion_data
+    cdef public bint has_num_fibers_map
+    cdef public double[:,:,:] num_fibers_data
+    cdef public bint has_wm_map
+    cdef public double[:,:,:] wm_data
+    cdef public bint has_csf_map
+    cdef public double[:,:,:] csf_data
+
 cdef class TrackerParameters:
     cdef func_ptr tracker
 
@@ -52,5 +75,6 @@ cdef class TrackerParameters:
     cdef public ShTrackerParameters sh
     cdef public ParallelTransportTrackerParameters ptt
     cdef public EudxTrackerParameters eudx
+    cdef public GlideTrackerParameters glide
 
     cdef void set_tracker_c(self, func_ptr tracker) noexcept nogil

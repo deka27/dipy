@@ -1216,3 +1216,98 @@ def seeds_directions_pairs(positions, peaks, *, max_cross=-1, peak_values=None):
             idx += n
 
     return seeds, directions
+
+
+def compute_uncertainty_map(pam, method="peak_ratio", mask=None):
+    """Compute an uncertainty map from a PeaksAndMetrics object.
+
+    Parameters
+    ----------
+    pam : PeaksAndMetrics
+        Object with ``peak_values`` (for ``'peak_ratio'``) or ``gfa``
+        (for ``'gfa'``) attributes.
+    method : str, optional
+        ``'peak_ratio'`` (default) — ratio of second to first peak value.
+        ``'gfa'`` — ``1 - GFA``.
+    mask : ndarray, optional
+        Binary mask. Voxels outside the mask are set to 0.
+
+    Returns
+    -------
+    uncertainty : ndarray
+        3-D float64 array with values in [0, 1].
+    """
+    if method == "peak_ratio":
+        pv = np.asarray(pam.peak_values, dtype=np.float64)
+        u = np.zeros(pv.shape[:3], dtype=np.float64)
+        valid = pv[..., 0] > 0
+        if pv.shape[-1] > 1:
+            has_second = pv[..., 1] > 0
+            both = valid & has_second
+            u[both] = pv[..., 1][both] / pv[..., 0][both]
+        np.clip(u, 0, 1, out=u)
+    elif method == "gfa":
+        gfa = np.array(pam.gfa, dtype=np.float64, copy=True)
+        u = np.clip(1.0 - gfa, 0.0, 1.0)
+    elif method == "composite":
+        pv = np.asarray(pam.peak_values, dtype=np.float64)
+        shape = pv.shape[:3]
+        # Component 1: peak ratio
+        ratio = np.zeros(shape, dtype=np.float64)
+        valid = pv[..., 0] > 0
+        if pv.shape[-1] > 1:
+            both = valid & (pv[..., 1] > 0)
+            ratio[both] = pv[..., 1][both] / pv[..., 0][both]
+        np.clip(ratio, 0, 1, out=ratio)
+        # Component 2: peak count normalized
+        n_slots = pv.shape[-1]
+        peak_count = np.sum(pv > 0, axis=-1).astype(np.float64)
+        count_norm = np.clip((peak_count - 1.0) / max(n_slots - 1, 1), 0, 1)
+        # Weighted combination (ratio=70%, count=30%)
+        u = 0.7 * ratio + 0.3 * count_norm
+        np.clip(u, 0, 1, out=u)
+    else:
+        raise ValueError(
+            f"Unknown uncertainty method: {method!r}. "
+            "Use 'peak_ratio', 'gfa', or 'composite'."
+        )
+
+    if mask is not None:
+        u[~np.asarray(mask, dtype=bool)] = 0.0
+
+    return u
+
+
+def score_streamlines(streamlines, uncertainty_map, affine):
+    """Score streamlines by local uncertainty along their paths.
+
+    For each streamline the mean uncertainty is sampled along the path and
+    the confidence is returned as ``1 - mean(uncertainty)``.
+
+    Parameters
+    ----------
+    streamlines : iterable of ndarray
+        Streamlines in world coordinates.
+    uncertainty_map : ndarray
+        3-D uncertainty map (values in [0, 1]).
+    affine : ndarray (4, 4)
+        Voxel-to-world affine matrix.
+
+    Returns
+    -------
+    scores : ndarray
+        Per-streamline confidence scores in [0, 1].
+    """
+    from scipy.ndimage import map_coordinates
+
+    inv_affine = np.linalg.inv(affine)
+    scores = np.empty(len(streamlines), dtype=np.float64)
+
+    for i, sl in enumerate(streamlines):
+        vox = np.dot(sl, inv_affine[:3, :3].T) + inv_affine[:3, 3]
+        vals = map_coordinates(
+            uncertainty_map, vox.T, order=1, mode="nearest"
+        )
+        scores[i] = 1.0 - np.mean(vals)
+
+    return scores

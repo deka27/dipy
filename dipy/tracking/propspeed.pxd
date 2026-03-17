@@ -36,6 +36,13 @@ cdef TrackerStatus parallel_transport_propagator(double* point,
                                                  RNGState* rng) noexcept nogil
 
 
+cdef TrackerStatus glide_propagator(double* point,
+                                    double* direction,
+                                    TrackerParameters params,
+                                    double* stream_data,
+                                    PmfGen pmf_gen,
+                                    RNGState* rng) noexcept nogil
+
 
 cdef cnp.npy_intp _propagation_direction(double *point, double* prev, double* qa,
                                 double *ind, double *odf_vertices,

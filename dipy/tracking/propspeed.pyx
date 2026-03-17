@@ -32,7 +32,7 @@ from dipy.tracking.tractogen cimport prepare_pmf
 from dipy.tracking.tracker_parameters cimport TrackerParameters, TrackerStatus
 
 from libc.stdlib cimport malloc, free
-from libc.math cimport M_PI, pow, sin, cos, fabs
+from libc.math cimport M_PI, pow, sin, cos, fabs, exp
 from libc.stdio cimport printf
 
 cdef extern from "dpy_math.h" nogil:
@@ -1052,3 +1052,246 @@ cdef TrackerStatus parallel_transport_propagator(double* point,
             return TrackerStatus.SUCCESS
 
     return TrackerStatus.FAIL
+
+
+cdef inline double _interp_scalar_3d(double[:,:,:] volume,
+                                     double x, double y,
+                                     double z) noexcept nogil:
+    """Trilinear interpolation of a 3D scalar field with edge clamping."""
+    cdef:
+        int x0 = <int>floor(x)
+        int y0 = <int>floor(y)
+        int z0 = <int>floor(z)
+        int x1 = x0 + 1
+        int y1 = y0 + 1
+        int z1 = z0 + 1
+        double fx = x - x0
+        double fy = y - y0
+        double fz = z - z0
+        int sx = volume.shape[0]
+        int sy = volume.shape[1]
+        int sz = volume.shape[2]
+        double c00, c01, c10, c11, c0, c1
+
+    if x0 < 0: x0 = 0
+    if y0 < 0: y0 = 0
+    if z0 < 0: z0 = 0
+    if x0 >= sx: x0 = sx - 1
+    if y0 >= sy: y0 = sy - 1
+    if z0 >= sz: z0 = sz - 1
+    if x1 < 0: x1 = 0
+    if y1 < 0: y1 = 0
+    if z1 < 0: z1 = 0
+    if x1 >= sx: x1 = sx - 1
+    if y1 >= sy: y1 = sy - 1
+    if z1 >= sz: z1 = sz - 1
+
+    c00 = volume[x0, y0, z0] * (1 - fz) + volume[x0, y0, z1] * fz
+    c01 = volume[x0, y1, z0] * (1 - fz) + volume[x0, y1, z1] * fz
+    c10 = volume[x1, y0, z0] * (1 - fz) + volume[x1, y0, z1] * fz
+    c11 = volume[x1, y1, z0] * (1 - fz) + volume[x1, y1, z1] * fz
+    c0 = c00 * (1 - fy) + c01 * fy
+    c1 = c10 * (1 - fy) + c11 * fy
+    return c0 * (1 - fx) + c1 * fx
+
+
+cdef TrackerStatus glide_propagator(double* point,
+                                    double* direction,
+                                    TrackerParameters params,
+                                    double* stream_data,
+                                    PmfGen pmf_gen,
+                                    RNGState* rng) noexcept nogil:
+    """GLIDE propagator: uncertainty-adaptive hybrid tractography.
+
+    Continuously modulates tracking between deterministic and probabilistic
+    based on local ODF peak uncertainty, with optional gyral bias correction.
+
+    Parameters
+    ----------
+    point : double[3]
+        Current tracking position in voxel coordinates.
+    direction : double[3]
+        Previous tracking direction.
+    params : TrackerParameters
+        GLIDE tracking parameters (params.glide must be set).
+    stream_data : double*
+        Streamline data persistent across tracking steps.
+    pmf_gen : PmfGen
+        Orientation data (PMF generator).
+    rng : RNGState*
+        Random number generator state (thread safe).
+
+    Returns
+    -------
+    status : TrackerStatus
+        SUCCESS if propagation was successful, FAIL otherwise.
+    """
+    cdef:
+        cnp.npy_intp i, det_idx, prob_idx
+        double* pmf
+        double last_cdf, cos_sim, sharpening
+        cnp.npy_intp len_pmf = pmf_gen.pmf.shape[0]
+        double u_val, f, eff_cos, gm_val, disp_val, nf_val
+        double max_value, dot, mag
+        double blend_dir[3]
+
+    if norm(direction) == 0:
+        return TrackerStatus.FAIL
+    normalize(direction)
+
+    # Interpolate uncertainty at current point
+    u_val = _interp_scalar_3d(params.glide.uncertainty_data,
+                              point[0], point[1], point[2])
+    if u_val < 0:
+        u_val = 0
+    elif u_val > 1:
+        u_val = 1
+
+    # Dispersion modulation: conservative OR with uncertainty
+    if params.glide.has_dispersion_map:
+        disp_val = _interp_scalar_3d(params.glide.dispersion_data,
+                                     point[0], point[1], point[2])
+        if disp_val < 0:
+            disp_val = 0
+        elif disp_val > 1:
+            disp_val = 1
+        if disp_val > u_val:
+            u_val = disp_val
+
+    # Compute blend factor f(u)
+    if params.glide.blend_mode == 0:
+        # Linear
+        f = u_val
+    elif params.glide.blend_mode == 1:
+        # Sigmoid
+        f = 1.0 / (1.0 + exp(-params.glide.sigmoid_steepness
+                              * (u_val - params.glide.sigmoid_midpoint)))
+    else:
+        # Step
+        if u_val > 0.5:
+            f = 1.0
+        else:
+            f = 0.0
+
+    # Num fibers modulation: scale blend factor by fiber count
+    if params.glide.has_num_fibers_map:
+        nf_val = _interp_scalar_3d(params.glide.num_fibers_data,
+                                   point[0], point[1], point[2])
+        if nf_val <= 1.0:
+            f = f * 0.5
+        elif nf_val >= 3.0:
+            f = f + 0.2
+            if f > 1.0:
+                f = 1.0
+
+    # Effective cosine similarity threshold
+    # cos_sim_max = tight angle (low uncertainty, deterministic)
+    # cos_sim_min = relaxed angle (high uncertainty, probabilistic)
+    eff_cos = (params.glide.cos_sim_max
+               - (params.glide.cos_sim_max - params.glide.cos_sim_min) * f)
+
+    # Gyral bias correction: relax angle in GM transition zone
+    if params.glide.has_gm_map:
+        gm_val = _interp_scalar_3d(params.glide.gm_data,
+                                   point[0], point[1], point[2])
+        if (gm_val >= params.glide.gm_transition_low
+                and gm_val <= params.glide.gm_transition_high):
+            eff_cos = eff_cos / params.glide.gm_relaxation_factor
+            if eff_cos < 0:
+                eff_cos = 0
+
+    # Get and threshold PMF
+    pmf = <double*> malloc(len_pmf * sizeof(double))
+    if pmf == NULL:
+        return TrackerStatus.FAIL
+    prepare_pmf(pmf, point, pmf_gen, params.glide.pmf_threshold, len_pmf)
+
+    # Zero out directions beyond effective angular threshold
+    for i in range(len_pmf):
+        cos_sim = pmf_gen.vertices[i][0] * direction[0] \
+                + pmf_gen.vertices[i][1] * direction[1] \
+                + pmf_gen.vertices[i][2] * direction[2]
+        if cos_sim < 0:
+            cos_sim = cos_sim * -1
+        if cos_sim < eff_cos:
+            pmf[i] = 0
+
+    # --- Deterministic direction: argmax of PMF within angular cone ---
+    # (found BEFORE sharpening so it reflects the true peak)
+    det_idx = -1
+    max_value = 0.0
+    for i in range(len_pmf):
+        if pmf[i] > max_value:
+            max_value = pmf[i]
+            det_idx = i
+
+    if det_idx == -1:
+        free(pmf)
+        return TrackerStatus.FAIL
+
+    # --- PMF sharpening for probabilistic sampling ---
+    # Sharpen the PMF so the CDF sample is "tamer" (closer to peak).
+    # Low uncertainty (f~0) -> high exponent -> very sharp -> sample ≈ peak
+    # High uncertainty (f~1) -> exponent ~1 -> original PMF -> true sampling
+    sharpening = 1.0 + (params.glide.sharpness_power - 1.0) * (1.0 - f)
+    for i in range(len_pmf):
+        if pmf[i] > 0:
+            pmf[i] = pow(pmf[i], sharpening)
+
+    # --- Probabilistic direction: CDF sampling from sharpened PMF ---
+    cumsum(pmf, pmf, len_pmf)
+    last_cdf = pmf[len_pmf - 1]
+    if last_cdf == 0:
+        free(pmf)
+        return TrackerStatus.FAIL
+
+    prob_idx = where_to_insert(pmf, random_float(rng) * last_cdf, len_pmf)
+
+    free(pmf)
+
+    # --- Direction interpolation ---
+    # Blend deterministic peak with probabilistic sample weighted by f.
+    # f ~ 0 (low uncertainty)  -> follow the deterministic peak
+    # f ~ 1 (high uncertainty) -> follow the probabilistic sample
+    #
+    # Antipodal alignment: flip each source direction to align with
+    # the current tracking direction before blending.
+
+    # Deterministic component (with antipodal check)
+    dot = (pmf_gen.vertices[det_idx][0] * direction[0]
+         + pmf_gen.vertices[det_idx][1] * direction[1]
+         + pmf_gen.vertices[det_idx][2] * direction[2])
+    if dot >= 0:
+        blend_dir[0] = (1.0 - f) * pmf_gen.vertices[det_idx][0]
+        blend_dir[1] = (1.0 - f) * pmf_gen.vertices[det_idx][1]
+        blend_dir[2] = (1.0 - f) * pmf_gen.vertices[det_idx][2]
+    else:
+        blend_dir[0] = -(1.0 - f) * pmf_gen.vertices[det_idx][0]
+        blend_dir[1] = -(1.0 - f) * pmf_gen.vertices[det_idx][1]
+        blend_dir[2] = -(1.0 - f) * pmf_gen.vertices[det_idx][2]
+
+    # Probabilistic component (with antipodal check)
+    dot = (pmf_gen.vertices[prob_idx][0] * direction[0]
+         + pmf_gen.vertices[prob_idx][1] * direction[1]
+         + pmf_gen.vertices[prob_idx][2] * direction[2])
+    if dot >= 0:
+        blend_dir[0] = blend_dir[0] + f * pmf_gen.vertices[prob_idx][0]
+        blend_dir[1] = blend_dir[1] + f * pmf_gen.vertices[prob_idx][1]
+        blend_dir[2] = blend_dir[2] + f * pmf_gen.vertices[prob_idx][2]
+    else:
+        blend_dir[0] = blend_dir[0] - f * pmf_gen.vertices[prob_idx][0]
+        blend_dir[1] = blend_dir[1] - f * pmf_gen.vertices[prob_idx][1]
+        blend_dir[2] = blend_dir[2] - f * pmf_gen.vertices[prob_idx][2]
+
+    # Normalize the blended direction
+    mag = sqrt(blend_dir[0] * blend_dir[0]
+             + blend_dir[1] * blend_dir[1]
+             + blend_dir[2] * blend_dir[2])
+    if mag == 0:
+        return TrackerStatus.FAIL
+
+    direction[0] = blend_dir[0] / mag
+    direction[1] = blend_dir[1] / mag
+    direction[2] = blend_dir[2] / mag
+
+    return TrackerStatus.SUCCESS

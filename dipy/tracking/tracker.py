@@ -12,7 +12,7 @@ from dipy.direction.pmf import SHCoeffPmfGen, SimplePeakGen, SimplePmfGen
 from dipy.tracking.local_tracking import LocalTracking, ParticleFilteringTracking
 from dipy.tracking.tracker_parameters import generate_tracking_parameters
 from dipy.tracking.tractogen import generate_tractogram
-from dipy.tracking.utils import seeds_directions_pairs
+from dipy.tracking.utils import compute_uncertainty_map, seeds_directions_pairs
 
 
 def generic_tracking(
@@ -885,6 +885,261 @@ def eudx_tracking(
         basis_type=basis_type,
         legacy=legacy,
         max_cross=max_cross,
+        nbr_threads=nbr_threads,
+        seed_buffer_fraction=seed_buffer_fraction,
+        save_seeds=save_seeds,
+    )
+
+
+def glide_tracking(
+    seed_positions,
+    sc,
+    affine,
+    *,
+    seed_directions=None,
+    sh=None,
+    pam=None,
+    sf=None,
+    # Uncertainty
+    uncertainty_map=None,
+    uncertainty_method="peak_ratio",
+    # Adaptive tracking
+    min_len=2,
+    max_len=500,
+    step_size=0.5,
+    voxel_size=None,
+    max_angle_min=20.0,
+    max_angle_max=60.0,
+    pmf_threshold=0.1,
+    sharpness_power=4.0,
+    blend_mode="sigmoid",
+    sigmoid_steepness=6.0,
+    sigmoid_midpoint=0.5,
+    # Gyral bias correction
+    gm_map=None,
+    gm_transition_low=0.1,
+    gm_transition_high=0.7,
+    gm_relaxation_factor=1.3,
+    # FORCE-specific maps (optional, Tier 1)
+    dispersion_map=None,
+    num_fibers_map=None,
+    wm_map=None,
+    csf_map=None,
+    # Standard
+    sphere=None,
+    basis_type=None,
+    legacy=True,
+    nbr_threads=0,
+    random_seed=0,
+    seed_buffer_fraction=1.0,
+    return_all=True,
+    save_seeds=False,
+):
+    """GLIDE: uncertainty-adaptive hybrid tractography.
+
+    Continuously modulates tracking behavior between deterministic and
+    probabilistic based on local ODF peak uncertainty, and optionally
+    applies gyral bias correction using a GM fraction map.
+
+    Parameters
+    ----------
+    seed_positions : ndarray
+        Seed positions in world space.
+    sc : StoppingCriterion
+        Stopping criterion.
+    affine : ndarray
+        Affine matrix.
+    seed_directions : ndarray, optional
+        Seed directions.
+    sh : ndarray, optional
+        Spherical Harmonics (SH) coefficients.
+    pam : PeaksAndMetrics, optional
+        Peaks and Metrics object. Used for automatic uncertainty computation
+        and, if ``sh`` / ``sf`` are not given, to extract SH coefficients.
+    sf : ndarray, optional
+        Spherical Function (SF).
+    uncertainty_map : ndarray, optional
+        Pre-computed 3-D uncertainty map with values in [0, 1].  If not
+        provided, computed automatically from *pam*.
+    uncertainty_method : str, optional
+        Method for automatic uncertainty computation when *uncertainty_map*
+        is ``None``.  ``'peak_ratio'`` (default) or ``'gfa'``.
+    min_len : int, optional
+        Minimum streamline length in mm.
+    max_len : int, optional
+        Maximum streamline length in mm.
+    step_size : float, optional
+        Step size in mm.
+    voxel_size : ndarray, optional
+        Voxel size.  Computed from *affine* if ``None``.
+    max_angle_min : float, optional
+        Tight max angle (degrees) used when uncertainty is low.
+    max_angle_max : float, optional
+        Relaxed max angle (degrees) used when uncertainty is high.
+    pmf_threshold : float, optional
+        PMF threshold.
+    sharpness_power : float, optional
+        Base exponent for PMF sharpening (e.g. 4.0).
+    blend_mode : str, optional
+        ``'linear'``, ``'sigmoid'`` (default), or ``'step'``.
+    sigmoid_steepness : float, optional
+        Steepness of sigmoid blending curve.
+    sigmoid_midpoint : float, optional
+        Midpoint of sigmoid blending curve.
+    gm_map : ndarray, optional
+        3-D GM fraction map for gyral bias correction.
+    gm_transition_low : float, optional
+        Lower bound of GM transition zone.
+    gm_transition_high : float, optional
+        Upper bound of GM transition zone.
+    gm_relaxation_factor : float, optional
+        Angular relaxation factor in GM transition zone.
+    dispersion_map : ndarray, optional
+        3-D orientation dispersion index (ODI) map from FORCE.  Raw ODI
+        values in [0.01, 0.3] are normalized to [0, 1] internally.  When
+        provided, high dispersion can override low peak-ratio uncertainty
+        to trigger probabilistic tracking.
+    num_fibers_map : ndarray, optional
+        3-D fiber count map from FORCE (values typically in [0, 3]).
+        Single-fiber voxels (<=1) push toward deterministic tracking;
+        crossings (>=3) push toward probabilistic.
+    wm_map : ndarray, optional
+        3-D white-matter fraction map from FORCE.  Stored for future ACT
+        integration; does not currently affect the propagator.
+    csf_map : ndarray, optional
+        3-D CSF fraction map from FORCE.  Stored for future ACT
+        integration; does not currently affect the propagator.
+    sphere : Sphere, optional
+        Sphere for SH / SF evaluation.
+    basis_type : str, optional
+        SH basis type.
+    legacy : bool, optional
+        Use legacy SH basis definition.
+    nbr_threads : int, optional
+        Number of threads (0 = all available).
+    random_seed : int, optional
+        Random seed (0 = non-deterministic).
+    seed_buffer_fraction : float, optional
+        Fraction of seed buffer to process at once.
+    return_all : bool, optional
+        Return all streamlines, not only those reaching the stopping
+        criterion.
+    save_seeds : bool, optional
+        Return seeds alongside streamlines.
+
+    Returns
+    -------
+    Tractogram
+    """
+    # --- Resolve uncertainty map ---
+    if uncertainty_map is None:
+        if pam is not None:
+            uncertainty_map = compute_uncertainty_map(
+                pam, method=uncertainty_method
+            )
+        elif sf is not None or sh is not None:
+            raise ValueError(
+                "Cannot automatically compute uncertainty map from sh/sf "
+                "alone. Either provide `pam` (PeaksAndMetrics object) for "
+                "automatic uncertainty computation, or provide "
+                "`uncertainty_map` directly as a 3D numpy array with values "
+                "in [0, 1]."
+            )
+        else:
+            raise ValueError(
+                "Glide requires an uncertainty map. Provide one of: "
+                "(1) `pam` — a PeaksAndMetrics object for automatic "
+                "computation, or (2) `uncertainty_map` — a pre-computed "
+                "3D array with values in [0, 1]."
+            )
+
+    # --- Resolve SH/SF data ---
+    if sh is None and sf is None:
+        if (pam is not None and hasattr(pam, "shm_coeff")
+                and pam.shm_coeff is not None):
+            sh = pam.shm_coeff
+        else:
+            raise ValueError(
+                "Glide requires SH coefficients (sh) or a spherical "
+                "function (sf) for tracking. Peaks alone are not sufficient "
+                "because Glide modulates the probability distribution, "
+                "which requires a continuous ODF representation. "
+                "Pass sh=... or sf=... alongside pam."
+            )
+
+    voxel_size = voxel_size if voxel_size is not None else voxel_sizes(affine)
+
+    # Convert blend_mode string to int
+    _blend_modes = {"linear": 0, "sigmoid": 1, "step": 2}
+    blend_mode_int = _blend_modes.get(blend_mode)
+    if blend_mode_int is None:
+        raise ValueError(
+            f"Unknown blend_mode {blend_mode!r}. "
+            f"Choose from {list(_blend_modes)}."
+        )
+
+    # Prepare contiguous arrays
+    uncertainty_data = np.ascontiguousarray(uncertainty_map, dtype=np.float64)
+    gm_data = (
+        np.ascontiguousarray(gm_map, dtype=np.float64)
+        if gm_map is not None
+        else None
+    )
+
+    # Dispersion: normalize ODI [0.01, 0.3] -> [0, 1]
+    dispersion_data = None
+    if dispersion_map is not None:
+        disp = np.asarray(dispersion_map, dtype=np.float64)
+        dispersion_data = np.ascontiguousarray(
+            np.clip((disp - 0.01) / (0.3 - 0.01), 0.0, 1.0))
+
+    # Num fibers: pass as-is (propagator expects raw [0, 3])
+    num_fibers_data = (np.ascontiguousarray(num_fibers_map, dtype=np.float64)
+                       if num_fibers_map is not None else None)
+
+    # WM/CSF: pass as-is (stored for future ACT integration)
+    wm_data = (np.ascontiguousarray(wm_map, dtype=np.float64)
+               if wm_map is not None else None)
+    csf_data = (np.ascontiguousarray(csf_map, dtype=np.float64)
+                if csf_map is not None else None)
+
+    params = generate_tracking_parameters(
+        "glide",
+        min_len=min_len,
+        max_len=max_len,
+        step_size=step_size,
+        voxel_size=voxel_size,
+        pmf_threshold=pmf_threshold,
+        max_angle_min=max_angle_min,
+        max_angle_max=max_angle_max,
+        sharpness_power=sharpness_power,
+        blend_mode=blend_mode_int,
+        sigmoid_steepness=sigmoid_steepness,
+        sigmoid_midpoint=sigmoid_midpoint,
+        gm_transition_low=gm_transition_low,
+        gm_transition_high=gm_transition_high,
+        gm_relaxation_factor=gm_relaxation_factor,
+        uncertainty_data=uncertainty_data,
+        gm_data=gm_data,
+        dispersion_data=dispersion_data,
+        num_fibers_data=num_fibers_data,
+        wm_data=wm_data,
+        csf_data=csf_data,
+        random_seed=random_seed,
+        return_all=return_all,
+    )
+
+    return generic_tracking(
+        seed_positions,
+        seed_directions,
+        sc,
+        params,
+        affine=affine,
+        sh=sh,
+        sf=sf,
+        sphere=sphere,
+        basis_type=basis_type,
+        legacy=legacy,
         nbr_threads=nbr_threads,
         seed_buffer_fraction=seed_buffer_fraction,
         save_seeds=save_seeds,

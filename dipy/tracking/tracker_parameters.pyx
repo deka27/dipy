@@ -8,6 +8,7 @@ from dipy.tracking.propspeed cimport (
     eudx_propagator,
     probabilistic_propagator,
     parallel_transport_propagator,
+    glide_propagator,
 )
 from dipy.tracking.utils import min_radius_curvature_from_angle
 
@@ -21,7 +22,15 @@ def generate_tracking_parameters(algo_name, *,
     double probe_length=0.5, double probe_radius=0, int probe_quality=3,
     int probe_count=1, double data_support_exponent=1, int random_seed=0,
     double peak_values_threshold=0.0239, double angle_threshold=60,
-    double min_total_weight=0.5):
+    double min_total_weight=0.5,
+    double max_angle_min=20.0, double max_angle_max=60.0,
+    double sharpness_power=4.0, int blend_mode=1,
+    double sigmoid_steepness=6.0, double sigmoid_midpoint=0.5,
+    double gm_transition_low=0.1, double gm_transition_high=0.7,
+    double gm_relaxation_factor=1.3,
+    object uncertainty_data=None, object gm_data=None,
+    object dispersion_data=None, object num_fibers_data=None,
+    object wm_data=None, object csf_data=None):
 
     cdef TrackerParameters params
 
@@ -78,6 +87,35 @@ def generate_tracking_parameters(algo_name, *,
                                    return_all=return_all)
         params.set_tracker_c(eudx_propagator)
         return params
+    elif algo_name == 'glide':
+        params = TrackerParameters(max_len=max_len,
+                                   min_len=min_len,
+                                   step_size=step_size,
+                                   voxel_size=voxel_size,
+                                   pmf_threshold=pmf_threshold,
+                                   max_angle=max_angle_max,
+                                   random_seed=random_seed,
+                                   return_all=return_all)
+        params.glide = GlideTrackerParameters(
+            max_angle_min=max_angle_min,
+            max_angle_max=max_angle_max,
+            pmf_threshold=pmf_threshold,
+            sharpness_power=sharpness_power,
+            blend_mode=blend_mode,
+            sigmoid_steepness=sigmoid_steepness,
+            sigmoid_midpoint=sigmoid_midpoint,
+            gm_transition_low=gm_transition_low,
+            gm_transition_high=gm_transition_high,
+            gm_relaxation_factor=gm_relaxation_factor,
+            uncertainty_data=uncertainty_data,
+            gm_data=gm_data,
+            dispersion_data=dispersion_data,
+            num_fibers_data=num_fibers_data,
+            wm_data=wm_data,
+            csf_data=csf_data,
+        )
+        params.set_tracker_c(glide_propagator)
+        return params
     else:
         raise ValueError("Invalid algorithm name")
 
@@ -112,6 +150,7 @@ cdef class TrackerParameters:
         self.sh = None
         self.ptt = None
         self.eudx = None
+        self.glide = None
 
         if pmf_threshold is not None:
             self.sh = ShTrackerParameters(pmf_threshold)
@@ -177,3 +216,77 @@ cdef class EudxTrackerParameters:
         self.peak_values_threshold = peak_values_threshold
         self.angle_threshold = angle_threshold
         self.min_total_weight = min_total_weight
+
+
+cdef class GlideTrackerParameters:
+    """GLIDE tracking parameters for uncertainty-adaptive hybrid tractography.
+
+    Parameters
+    ----------
+    max_angle_min : double
+        Minimum max angle (degrees) used when uncertainty is low (tight).
+    max_angle_max : double
+        Maximum max angle (degrees) used when uncertainty is high (relaxed).
+    pmf_threshold : double
+        PMF threshold for filtering weak directions.
+    sharpness_power : double
+        Base exponent for PMF sharpening.
+    blend_mode : int
+        Blending mode: 0=linear, 1=sigmoid, 2=step.
+    sigmoid_steepness : double
+        Steepness of sigmoid blending curve.
+    sigmoid_midpoint : double
+        Midpoint of sigmoid blending curve.
+    gm_transition_low : double
+        Lower bound of GM transition zone for gyral bias correction.
+    gm_transition_high : double
+        Upper bound of GM transition zone for gyral bias correction.
+    gm_relaxation_factor : double
+        Angular relaxation factor in GM transition zone.
+    uncertainty_data : ndarray
+        3D uncertainty map (float64, contiguous).
+    gm_data : ndarray, optional
+        3D GM fraction map (float64, contiguous).
+    """
+
+    def __init__(self, double max_angle_min, double max_angle_max,
+                 double pmf_threshold, double sharpness_power,
+                 int blend_mode, double sigmoid_steepness,
+                 double sigmoid_midpoint, double gm_transition_low,
+                 double gm_transition_high, double gm_relaxation_factor,
+                 object uncertainty_data, object gm_data=None,
+                 object dispersion_data=None, object num_fibers_data=None,
+                 object wm_data=None, object csf_data=None):
+        self.cos_sim_min = np.cos(np.deg2rad(max_angle_max))
+        self.cos_sim_max = np.cos(np.deg2rad(max_angle_min))
+        self.pmf_threshold = pmf_threshold
+        self.sharpness_power = sharpness_power
+        self.blend_mode = blend_mode
+        self.sigmoid_steepness = sigmoid_steepness
+        self.sigmoid_midpoint = sigmoid_midpoint
+        self.gm_transition_low = gm_transition_low
+        self.gm_transition_high = gm_transition_high
+        self.gm_relaxation_factor = gm_relaxation_factor
+        self.uncertainty_data = np.ascontiguousarray(
+            uncertainty_data, dtype=np.float64)
+        self.has_gm_map = gm_data is not None
+        if gm_data is not None:
+            self.gm_data = np.ascontiguousarray(gm_data, dtype=np.float64)
+
+        self.has_dispersion_map = dispersion_data is not None
+        if dispersion_data is not None:
+            self.dispersion_data = np.ascontiguousarray(
+                dispersion_data, dtype=np.float64)
+
+        self.has_num_fibers_map = num_fibers_data is not None
+        if num_fibers_data is not None:
+            self.num_fibers_data = np.ascontiguousarray(
+                num_fibers_data, dtype=np.float64)
+
+        self.has_wm_map = wm_data is not None
+        if wm_data is not None:
+            self.wm_data = np.ascontiguousarray(wm_data, dtype=np.float64)
+
+        self.has_csf_map = csf_data is not None
+        if csf_data is not None:
+            self.csf_data = np.ascontiguousarray(csf_data, dtype=np.float64)
