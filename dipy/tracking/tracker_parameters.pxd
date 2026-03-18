@@ -56,6 +56,7 @@ cdef class GlideTrackerParameters:
     cdef public double[:,:,:] wm_data
     cdef public bint has_csf_map
     cdef public double[:,:,:] csf_data
+    cdef public double peak_floor_prob
 
 cdef class TrackerParameters:
     cdef func_ptr tracker

@@ -1238,6 +1238,21 @@ cdef TrackerStatus glide_propagator(double* point,
         if pmf[i] > 0:
             pmf[i] = pow(pmf[i], sharpening)
 
+    # --- Peak floor: prevent CDF starvation of weak ODF directions ---
+    # Any direction that had non-zero PMF before sharpening (still non-zero
+    # after, since pow(x>0, exp) > 0) gets a minimum floor relative to the
+    # post-sharpening max. Prevents thin-bundle peaks (e.g. CST fan branches
+    # at crossings) from being completely starved by the dominant peak.
+    if params.glide.peak_floor_prob > 0:
+        max_value = 0.0
+        for i in range(len_pmf):
+            if pmf[i] > max_value:
+                max_value = pmf[i]
+        if max_value > 0:
+            for i in range(len_pmf):
+                if 0 < pmf[i] < params.glide.peak_floor_prob * max_value:
+                    pmf[i] = params.glide.peak_floor_prob * max_value
+
     # --- Probabilistic direction: CDF sampling from sharpened PMF ---
     cumsum(pmf, pmf, len_pmf)
     last_cdf = pmf[len_pmf - 1]

@@ -925,6 +925,8 @@ def glide_tracking(
     num_fibers_map=None,
     wm_map=None,
     csf_map=None,
+    # Peak floor: minimum PMF probability for non-zero directions after sharpening
+    peak_floor_prob=0.0,
     # Standard
     sphere=None,
     basis_type=None,
@@ -1119,6 +1121,7 @@ def glide_tracking(
         gm_transition_low=gm_transition_low,
         gm_transition_high=gm_transition_high,
         gm_relaxation_factor=gm_relaxation_factor,
+        peak_floor_prob=peak_floor_prob,
         uncertainty_data=uncertainty_data,
         gm_data=gm_data,
         dispersion_data=dispersion_data,

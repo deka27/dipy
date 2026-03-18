@@ -28,6 +28,7 @@ def generate_tracking_parameters(algo_name, *,
     double sigmoid_steepness=6.0, double sigmoid_midpoint=0.5,
     double gm_transition_low=0.1, double gm_transition_high=0.7,
     double gm_relaxation_factor=1.3,
+    double peak_floor_prob=0.0,
     object uncertainty_data=None, object gm_data=None,
     object dispersion_data=None, object num_fibers_data=None,
     object wm_data=None, object csf_data=None):
@@ -107,6 +108,7 @@ def generate_tracking_parameters(algo_name, *,
             gm_transition_low=gm_transition_low,
             gm_transition_high=gm_transition_high,
             gm_relaxation_factor=gm_relaxation_factor,
+            peak_floor_prob=peak_floor_prob,
             uncertainty_data=uncertainty_data,
             gm_data=gm_data,
             dispersion_data=dispersion_data,
@@ -254,7 +256,8 @@ cdef class GlideTrackerParameters:
                  int blend_mode, double sigmoid_steepness,
                  double sigmoid_midpoint, double gm_transition_low,
                  double gm_transition_high, double gm_relaxation_factor,
-                 object uncertainty_data, object gm_data=None,
+                 object uncertainty_data, double peak_floor_prob=0.0,
+                 object gm_data=None,
                  object dispersion_data=None, object num_fibers_data=None,
                  object wm_data=None, object csf_data=None):
         self.cos_sim_min = np.cos(np.deg2rad(max_angle_max))
@@ -267,6 +270,7 @@ cdef class GlideTrackerParameters:
         self.gm_transition_low = gm_transition_low
         self.gm_transition_high = gm_transition_high
         self.gm_relaxation_factor = gm_relaxation_factor
+        self.peak_floor_prob = peak_floor_prob
         self.uncertainty_data = np.ascontiguousarray(
             uncertainty_data, dtype=np.float64)
         self.has_gm_map = gm_data is not None
