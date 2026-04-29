@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.12']
     steps:
     - uses: actions/checkout@v6.0.2
       with:
@@ -35,7 +35,7 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install .[optional]
+        pip install ".[viz,ml]" scikit-image boto3 numexpr
         pip install .[doc]
     - name: Build documentation
       run: |
