@@ -23,7 +23,7 @@ from dipy.reconst.shm import convert_sh_descoteaux_tournier
 from dipy.testing import assert_true, assert_warns
 from dipy.utils.optpkg import optional_package
 from dipy.utils.tripwire import TripWireError
-from dipy.workflows.base import format_key_value_table
+from dipy.workflows.base import _strip_rst_markup, format_key_value_table
 from dipy.workflows.io import (
     ConcatenateTractogramFlow,
     ConvertSHFlow,
@@ -210,6 +210,53 @@ def test_format_key_value_table():
     npt.assert_equal(len(unsorted_lines), 2)
     npt.assert_equal("zebra" in unsorted_lines[0], True)
     npt.assert_equal("apple" in unsorted_lines[1], True)
+
+    # Newlines in values are preserved as separate output rows
+    multiline = format_key_value_table(
+        {"key": "first line\nsecond line"},
+        key_header="Key",
+        value_header="Value",
+    )
+    npt.assert_equal(any("first line" in line for line in multiline.splitlines()), True)
+    npt.assert_equal(
+        any("second line" in line for line in multiline.splitlines()), True
+    )
+
+    # Leading whitespace on a value line is preserved in the rendered row
+    indented = format_key_value_table(
+        {"key": "    indented text"},
+        key_header="Key",
+        value_header="Value",
+    )
+    npt.assert_equal(
+        any("    indented text" in line for line in indented.splitlines()), True
+    )
+
+
+def test_strip_rst_markup():
+    # Plain text passes through untouched
+    npt.assert_equal(_strip_rst_markup("hello world"), "hello world")
+
+    # RST inline roles are stripped, content preserved
+    npt.assert_equal(_strip_rst_markup(":math:`x = 1`"), "x = 1")
+    npt.assert_equal(_strip_rst_markup(":footcite:`Smith2020`"), "Smith2020")
+
+    # LaTeX brace commands are stripped, content preserved
+    npt.assert_equal(_strip_rst_markup(r"\text{bvec}"), "bvec")
+    npt.assert_equal(_strip_rst_markup(r"\mathbf{x}"), "x")
+
+    # Known LaTeX symbols are replaced with Unicode equivalents
+    npt.assert_equal(_strip_rst_markup(r"a \pm b"), "a ± b")
+    npt.assert_equal(_strip_rst_markup(r"\mu"), "μ")
+
+    # All three rules combined in one expression
+    npt.assert_equal(
+        _strip_rst_markup(r":math:`norm(\text{bvec}) = 1 \pm \text{bvecs_tol}`"),
+        "norm(bvec) = 1 ± bvecs_tol",
+    )
+
+    # Unknown LaTeX symbols are left as-is
+    npt.assert_equal(_strip_rst_markup(r"\unknown"), r"\unknown")
 
 
 def test_format_data_names_table():
