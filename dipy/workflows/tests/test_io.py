@@ -217,9 +217,7 @@ def test_format_key_value_table():
         key_header="Key",
         value_header="Value",
     )
-    npt.assert_equal(
-        any("first line" in line for line in multiline.splitlines()), True
-    )
+    npt.assert_equal(any("first line" in line for line in multiline.splitlines()), True)
     npt.assert_equal(
         any("second line" in line for line in multiline.splitlines()), True
     )
