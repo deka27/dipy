@@ -44,7 +44,7 @@ def load_pam(fname, *, verbose=False):
 
     """
     if Path(fname).suffix.lower() != ".pam5":
-        raise IOError("This function supports only PAM5 (HDF5) files")
+        raise OSError("This function supports only PAM5 (HDF5) files")
 
     f = h5py.File(fname, "r")
 
@@ -123,7 +123,7 @@ def save_pam(fname, pam, *, affine=None, verbose=False):
 
     """
     if Path(fname).suffix.lower() != ".pam5":
-        raise IOError("This function saves only PAM5 (HDF5) files")
+        raise OSError("This function saves only PAM5 (HDF5) files")
 
     if not (
         hasattr(pam, "peak_dirs")
