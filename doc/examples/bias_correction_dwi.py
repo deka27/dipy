@@ -517,7 +517,7 @@ plt.savefig("compare_bias_correction.png", dpi=150, bbox_inches="tight")
 ###############################################################################
 # Field difference maps: where do DIPY methods diverge from N4?
 # --------------------------------------------------------------
-# The pixel-wise difference (DIPY − N4) reveals where the two philosophies
+# The pixel-wise difference (DIPY - N4) reveals where the two philosophies
 # disagree.  Small residuals confirm that both methods see the same physics.
 # Larger residuals (typically at cortical edges or near ventricles) reflect
 # N4's tendency to model sharp gradients that the smooth DIPY basis
@@ -526,10 +526,10 @@ plt.savefig("compare_bias_correction.png", dpi=150, bbox_inches="tight")
 
 if _HAVE_SITK:
     fig3, axes3 = plt.subplots(1, 2, figsize=(11, 4))
-    fig3.suptitle("Bias Field Difference vs N4  (DIPY − N4)", fontsize=12)
+    fig3.suptitle("Bias Field Difference vs N4  (DIPY - N4)", fontsize=12)
     for ax, label, bf in [
-        (axes3[0], "poly − N4", bias_poly),
-        (axes3[1], "bspline − N4", bias_bspline),
+        (axes3[0], "poly - N4", bias_poly),
+        (axes3[1], "bspline - N4", bias_bspline),
     ]:
         diff = bf[:, :, mid_slice].T - bias_n4[:, :, mid_slice].T
         lim = max(np.abs(diff).max(), 1e-6)
