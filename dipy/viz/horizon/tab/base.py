@@ -269,8 +269,7 @@ class TabManager:
         for element in args:
             if element.__class__.__name__ == "HorizonUIElement":
                 if isinstance(element.obj, list):
-                    for obj in element.obj:
-                        elements.append(obj)
+                    elements.extend(obj for obj in element.obj)
                 else:
                     elements.append(element.obj)
             else:
