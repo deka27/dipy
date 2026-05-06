@@ -19,6 +19,7 @@ select = [
   "W",
   "B",
   "I",
+  "PERF",
 ]
 ignore = [
   "B905",
