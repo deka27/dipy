@@ -163,12 +163,12 @@ class LocalTracking:
         ):
             warn(
                 "Unidirectional tractography will be performed "
-                + "without providing initial directions nor "
-                + "randomizing extracted initial forward "
-                + "directions. This may introduce directional "
-                + "biases in the reconstructed streamlines. "
-                + "See ``initial_directions`` and "
-                + "``randomize_forward_direction`` parameters.",
+                "without providing initial directions nor "
+                "randomizing extracted initial forward "
+                "directions. This may introduce directional "
+                "biases in the reconstructed streamlines. "
+                "See ``initial_directions`` and "
+                "``randomize_forward_direction`` parameters.",
                 stacklevel=2,
             )
 

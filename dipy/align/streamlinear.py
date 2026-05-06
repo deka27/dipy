@@ -1316,7 +1316,7 @@ def groupwise_slr(
         if verbose:
             logger.info(
                 f"Preprocessing: bundle {i}/{n_bundle}: "
-                + f"{len(bundles[i])} streamlines found."
+                f"{len(bundles[i])} streamlines found."
             )
 
         if select_random is not None:

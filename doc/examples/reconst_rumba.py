@@ -75,8 +75,8 @@ sphere = get_sphere(name="symmetric362")
 rumba = RumbaSDModel(gtab)
 print(
     f"wm_response: {rumba.wm_response}, "
-    + f"csf_response: {rumba.csf_response}, "
-    + f"gm_response: {rumba.gm_response}"
+    f"csf_response: {rumba.csf_response}, "
+    f"gm_response: {rumba.gm_response}"
 )
 
 ###############################################################################

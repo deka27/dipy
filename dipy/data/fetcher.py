@@ -773,7 +773,7 @@ fetch_taiwan_ntu_dsi = _make_fetcher(
     ],
     doc="Download a DSI dataset with 203 gradient directions",
     msg="See DSI203_license.txt for LICENSE. For the complete datasets"
-    + " please visit https://dsi-studio.labsolver.org",
+    " please visit https://dsi-studio.labsolver.org",
     data_size="91MB",
 )
 
@@ -848,7 +848,7 @@ fetch_scil_b0 = _make_fetcher(
     [Path("datasets_multi-site_all_companies.zip")],
     md5_list=["e9810fa5bf21b99da786647994d7d5b7"],
     doc="Download b=0 datasets from multiple MR systems (GE, Philips, "
-    + "Siemens) and different magnetic fields (1.5T and 3T)",
+    "Siemens) and different magnetic fields (1.5T and 3T)",
     data_size="9.2MB",
     unzip=True,
 )
@@ -904,8 +904,8 @@ fetch_cfin_multib = _make_fetcher(
     doc="Download CFIN multi b-value diffusion data",
     msg=(
         "This data was provided by Brian Hansen and Sune Jespersen"
-        + " More details about the data are available in their paper: "
-        + " https://www.nature.com/articles/sdata201672"
+        " More details about the data are available in their paper: "
+        " https://www.nature.com/articles/sdata201672"
     ),
 )
 
@@ -1278,11 +1278,11 @@ fetch_cti_rat1 = _make_fetcher(
         "34bc3d5acea9442d05ef185717780440",
     ],
     doc="Download Rat Brain DDE data for CTI reconstruction"
-    + " (Rat #1 data from Henriques et al. MRM 2021).",
+    " (Rat #1 data from Henriques et al. MRM 2021).",
     data_size="152.92 MB",
     msg=(
         "More details about the data are available in the paper: "
-        + "https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.28938"
+        "https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.28938"
     ),
 )
 
@@ -1316,12 +1316,12 @@ fetch_DiB_70_lte_pte_ste = _make_fetcher(
         Path("DiB_mask.nii.gz"),
     ],
     doc="Download QTE data with linear, planar, "
-    + "and spherical tensor encoding. If using this data please cite "
-    + "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
-    + "spherical tensor-valued diffusion MRI data by free waveform "
-    + "encoding in healthy brain, water, oil and liquid crystals. "
-    + "Data in Brief (2019),"
-    + "DOI: https://doi.org/10.1016/j.dib.2019.104208",
+    "and spherical tensor encoding. If using this data please cite "
+    "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
+    "spherical tensor-valued diffusion MRI data by free waveform "
+    "encoding in healthy brain, water, oil and liquid crystals. "
+    "Data in Brief (2019),"
+    "DOI: https://doi.org/10.1016/j.dib.2019.104208",
     md5_list=[
         "11f2e0d53e19061654eb3cdfc8fe9827",
         "15021885b4967437c8cf441c09045c25",
@@ -1351,12 +1351,12 @@ fetch_DiB_217_lte_pte_ste = _make_fetcher(
         Path("DiB_mask.nii.gz"),
     ],
     doc="Download QTE data with linear, planar, "
-    + "and spherical tensor encoding. If using this data please cite "
-    + "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
-    + "spherical tensor-valued diffusion MRI data by free waveform "
-    + "encoding in healthy brain, water, oil and liquid crystals. "
-    + "Data in Brief (2019),"
-    + "DOI: https://doi.org/10.1016/j.dib.2019.104208",
+    "and spherical tensor encoding. If using this data please cite "
+    "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
+    "spherical tensor-valued diffusion MRI data by free waveform "
+    "encoding in healthy brain, water, oil and liquid crystals. "
+    "Data in Brief (2019),"
+    "DOI: https://doi.org/10.1016/j.dib.2019.104208",
     md5_list=[
         "424e9cf75b20bc1f7ae1acde26b26da0",
         "8e70d14fb8f08065a7a0c4d3033179c6",
@@ -3442,7 +3442,7 @@ def fetch_hbn(subjects, *, path=None, include_afq=False):
     else:
         TripWire(
             "The `fetch_hbn` function requires the boto3"
-            + " library, but that is not installed."
+            " library, but that is not installed."
         )
 
     # Anonymous access:

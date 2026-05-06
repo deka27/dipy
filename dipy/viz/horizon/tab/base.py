@@ -186,7 +186,7 @@ class TabManager:
         if not self._synchronize_slices and slices_tabs:
             msg = (
                 "Images are of different dimensions, "
-                + "synchronization of slices will not work"
+                "synchronization of slices will not work"
             )
             logger.warning(msg)
 
