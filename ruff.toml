@@ -21,6 +21,7 @@ extend-select = [
   "C90",
   "PERF",
   "W",
+  "UP",
 ]
 ignore = [
   "B905",
