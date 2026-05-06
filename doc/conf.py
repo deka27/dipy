@@ -109,7 +109,7 @@ master_doc = "index"
 
 build_date = datetime.datetime.fromtimestamp(
     int(os.environ.get("SOURCE_DATE_EPOCH", time.time())),
-    tz=datetime.timezone.utc,
+    tz=datetime.UTC,
 )
 
 # General information about the project.
