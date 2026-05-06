@@ -2634,16 +2634,12 @@ def read_mni_template(*, version="a", contrast="T2"):
         if isinstance(contrast, str):
             return nib.load(file_dict_a[contrast])
         else:
-            out_list = []
-            for k in contrast:
-                out_list.append(nib.load(file_dict_a[k]))
+            out_list = [nib.load(file_dict_a[k]) for k in contrast]
     elif version == "c":
         if isinstance(contrast, str):
             return nib.load(file_dict_c[contrast])
         else:
-            out_list = []
-            for k in contrast:
-                out_list.append(nib.load(file_dict_c[k]))
+            out_list = [nib.load(file_dict_c[k]) for k in contrast]
     else:
         raise ValueError("Only 2009a and 2009c versions are available")
     return out_list
@@ -2929,15 +2925,16 @@ def get_file_formats():
         Path to the reference anatomical image.
     """
     ref_anat = dipy_home / "bundle_file_formats_example" / "template0.nii.gz"
-    bundles_list = []
-    for filename in [
-        "cc_m_sub.trk",
-        "laf_m_sub.tck",
-        "lpt_m_sub.fib",
-        "raf_m_sub.vtk",
-        "rpt_m_sub.dpy",
-    ]:
-        bundles_list.append(dipy_home / "bundle_file_formats_example" / filename)
+    bundles_list = [
+        dipy_home / "bundle_file_formats_example" / filename
+        for filename in [
+            "cc_m_sub.trk",
+            "laf_m_sub.tck",
+            "lpt_m_sub.fib",
+            "raf_m_sub.vtk",
+            "rpt_m_sub.dpy",
+        ]
+    ]
 
     return bundles_list, ref_anat
 

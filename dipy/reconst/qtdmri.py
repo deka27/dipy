@@ -325,9 +325,9 @@ class QtdmriModel(Cache):
         b0_indices = np.arange(self.gtab.tau.shape[0])[self.gtab.b0s_mask]
         tau0_ordered = self.gtab.tau[b0_indices]
         unique_taus = np.unique(self.gtab.tau)
-        first_tau_pos = []
-        for unique_tau in unique_taus:
-            first_tau_pos.append(np.where(tau0_ordered == unique_tau)[0][0])
+        first_tau_pos = [
+            np.where(tau0_ordered == unique_tau)[0][0] for unique_tau in unique_taus
+        ]
         M0 = M[b0_indices[first_tau_pos]]
 
         lopt = 0.0
@@ -1527,7 +1527,7 @@ def qtdmri_index_matrix(radial_order, time_order):
         for i in range(0, n + 1):
             for j in range(0, n - i + 1):
                 for o in range(0, time_order + 1):
-                    index_matrix.append([n - i - j, j, i, o])
+                    index_matrix.append([n - i - j, j, i, o])  # noqa: PERF401
 
     return np.array(index_matrix)
 
@@ -1540,7 +1540,7 @@ def qtdmri_isotropic_index_matrix(radial_order, time_order):
             ll = n + 2 - 2 * j
             for m in range(-ll, ll + 1):
                 for o in range(0, time_order + 1):
-                    index_matrix.append([j, ll, m, o])
+                    index_matrix.append([j, ll, m, o])  # noqa: PERF401
     return np.array(index_matrix)
 
 

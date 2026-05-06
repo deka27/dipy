@@ -550,8 +550,7 @@ class ClassifyTissueFlow(Workflow):
                 save_nifti(tissue_out_path, segmentation_final, affine)
                 save_nifti(opve, PVE, affine)
                 class_list.append(["0", "Background"])
-                for i in range(1, nclass + 1):
-                    class_list.append([f"{i}", f"Tissue_{i}"])
+                class_list.extend([f"{i}", f"Tissue_{i}"] for i in range(1, nclass + 1))
                 class_list.append(
                     [
                         "# Due to the nature of the HMRF algorithm",

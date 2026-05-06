@@ -493,15 +493,13 @@ class StreamlineLinearRegistration:
 
         mat = compose_transformations(moving_mat, opt_mat, static_mat)
 
-        mat_history = []
-
-        if opt.evolution is not None:
-            for vecs in opt.evolution:
-                mat_history.append(
-                    compose_transformations(
-                        moving_mat, compose_matrix44(vecs), static_mat
-                    )
-                )
+        if opt.evolution is None:
+            mat_history = []
+        else:
+            mat_history = [
+                compose_transformations(moving_mat, compose_matrix44(vecs), static_mat)
+                for vecs in opt.evolution
+            ]
 
         # If we are running halfway streamline linear registration (for
         # groupwise registration or atlasing) the registration map is different
