@@ -897,7 +897,7 @@ def mask_for_response_ssst(gtab, data, *, roi_center=None, roi_radii=10, fa_thr=
     mask[fa > fa_thr] = 1
 
     if np.sum(mask) == 0:
-        msg = f"""No voxel with a FA higher than {str(fa_thr)} were found.
+        msg = f"""No voxel with a FA higher than {fa_thr} were found.
         Try a larger roi or a lower threshold."""
         warnings.warn(msg, UserWarning, stacklevel=2)
 

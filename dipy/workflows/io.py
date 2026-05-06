@@ -710,7 +710,7 @@ class FetchFlow(Workflow):
                         )
                     except Exception as e:
                         logger.error(
-                            f"Error while fetching HCP dataset: {str(e)}", exc_info=True
+                            f"Error while fetching HCP dataset: {e}", exc_info=True
                         )
                 elif data_name == "hbn":
                     if not subjects:
@@ -724,7 +724,7 @@ class FetchFlow(Workflow):
                         )
                     except Exception as e:
                         logger.error(
-                            f"Error while fetching HBN dataset: {str(e)}", exc_info=True
+                            f"Error while fetching HBN dataset: {e}", exc_info=True
                         )
                 else:
                     available_data[data_name](include_optional=include_optional)

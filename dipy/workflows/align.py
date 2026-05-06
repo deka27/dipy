@@ -586,8 +586,8 @@ class ImageRegistrationFlow(Workflow):
                 """
                 Saving the moved image file and the affine matrix.
                 """
-                logger.info(f"Optimal parameters: {str(xopt)}")
-                logger.info(f"Similarity metric: {str(fopt)}")
+                logger.info(f"Optimal parameters: {xopt}")
+                logger.info(f"Similarity metric: {fopt}")
 
                 if save_metric:
                     save_qa_metric(qual_val_file, xopt, fopt)

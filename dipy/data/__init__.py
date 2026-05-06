@@ -451,7 +451,7 @@ def load_sdp_constraints(model_name, *, order=None):
 
     file = model_name + "_constraint"
     if order is not None:
-        file += f"_{str(order)}"
+        file += f"_{order}"
     if order is None:
         file += "_SC"
     file += ".npz"

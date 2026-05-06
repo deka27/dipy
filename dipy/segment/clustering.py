@@ -95,7 +95,7 @@ class Cluster:
         return "[" + ", ".join(map(str, self.indices)) + "]"
 
     def __repr__(self):
-        return f"Cluster({str(self)})"
+        return f"Cluster({self})"
 
     def __eq__(self, other):
         return isinstance(other, Cluster) and self.indices == other.indices
@@ -254,7 +254,7 @@ class ClusterMap:
         return "[" + ", ".join(map(str, self)) + "]"
 
     def __repr__(self):
-        return f"ClusterMap({str(self)})"
+        return f"ClusterMap({self})"
 
     def _richcmp(self, other, op):
         """Compares this cluster map with another cluster map or an integer.
