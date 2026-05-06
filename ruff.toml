@@ -12,19 +12,17 @@ extend-exclude = [
 ]
 
 [lint]
-select = [
-  "F",
-  "E",
-  "C",
-  "W",
+extend-select = [
   "B",
+  "C4",
   "I",
+  "C90",
   "PERF",
+  "W",
 ]
 ignore = [
   "B905",
   "C901",
-  "E203",
   "F811"
 ]
 
