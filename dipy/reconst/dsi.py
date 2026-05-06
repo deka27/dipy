@@ -103,7 +103,7 @@ class DiffusionSpectrumModel(OdfModel, Cache):
         --------
         dipy.reconst.gqi.GeneralizedQSampling
 
-        """  # noqa: E501
+        """
 
         self.bvals = gtab.bvals
         self.bvecs = gtab.bvecs
@@ -263,7 +263,7 @@ class DiffusionSpectrumFit(OdfFit):
         ----------
         .. footbibliography::
 
-        """  # noqa: E501
+        """
 
         Pr = self.pdf(normalized=normalized)
 
@@ -554,7 +554,7 @@ class DiffusionSpectrumDeconvModel(DiffusionSpectrumModel):
         ----------
         .. footbibliography::
 
-        """  # noqa: E501
+        """
         DiffusionSpectrumModel.__init__(
             self,
             gtab,

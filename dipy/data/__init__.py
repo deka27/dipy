@@ -283,7 +283,7 @@ def get_sphere(*, name="symmetric362"):
         ...
     DataError: No sphere called "not a sphere name"
 
-    """  # noqa: E501
+    """
     fname = SPHERE_FILES.get(name)
     if fname is None:
         raise DataError(f'No sphere called "{name}"')

@@ -1742,7 +1742,7 @@ def convert_sh_descoteaux_tournier(sh_coeffs):
     .. footbibliography::
     .. [mrtrixbasis] https://mrtrix.readthedocs.io/en/latest/concepts/spherical_harmonics.html
     .. [mrtrixdipybases] https://github.com/dipy/dipy/discussions/2959#discussioncomment-7481675
-    """  # noqa: E501
+    """
 
     sh_order_max = calculate_max_order(sh_coeffs.shape[-1])
     m_values, l_values = sph_harm_ind_list(sh_order_max)

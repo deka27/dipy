@@ -126,7 +126,7 @@ class HistoResDNN:
         References
         ----------
         .. footbibliography::
-        """  # noqa: E501
+        """
         if not have_torch:
             raise torch()
 

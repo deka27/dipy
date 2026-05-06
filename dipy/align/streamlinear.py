@@ -388,7 +388,7 @@ class StreamlineLinearRegistration:
         ----------
         .. footbibliography::
 
-        """  # noqa: E501
+        """
         self.x0 = self._set_x0(x0)
         self.metric = metric
 

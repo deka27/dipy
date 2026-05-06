@@ -1122,7 +1122,7 @@ def prepare_release(*, from_step, last_tag, new_version, maint_branch):
       7. pyproject        – set version in pyproject.toml
       8. doctest          – run extension module doctests
       9. tests            – run full test suite
-    """  # noqa: E501
+    """
     if not os.path.isdir("dipy") or not os.path.isfile("pyproject.toml"):
         raise click.ClickException("Run this command from the root 'dipy' directory.")
 
