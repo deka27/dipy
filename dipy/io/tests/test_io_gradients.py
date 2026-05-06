@@ -37,7 +37,7 @@ def test_read_bvals_bvecs():
         new_bvecs1 = bvecs[:, :2]
         # Make a temporary file
         fname = "test_bv_file1.txt"
-        with open(Path(tmpdir) / fname, "wt") as bv_file1:
+        with open(Path(tmpdir) / fname, "w") as bv_file1:
             # And fill it with these 2-columned bvecs:
             for x in range(new_bvecs1.shape[0]):
                 bv_file1.write(f"{new_bvecs1[x][0]} {new_bvecs1[x][1]}\n")

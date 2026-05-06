@@ -299,7 +299,7 @@ def test_image_registration(rng):
         apply_trans = ApplyTransformFlow()
 
         def read_distance(qual_fname):
-            with open(Path(temp_out_dir) / qual_fname, "r") as f:
+            with open(Path(temp_out_dir) / qual_fname) as f:
                 return float(f.readlines()[-1])
 
         def test_com():

@@ -458,7 +458,7 @@ def _check_copyright_year():
 
     # LICENSE
     click.secho("--- Checking LICENSE copyright year ---", bold=True)
-    with open("LICENSE", "r") as f:
+    with open("LICENSE") as f:
         content = f.read()
     pattern = r"(Copyright \(c\) \d{4}-)(\d{4})"
     match = re.search(pattern, content)
@@ -479,7 +479,7 @@ def _check_copyright_year():
     # doc/conf.py
     click.secho("--- Checking doc/conf.py copyright year ---", bold=True)
     conf_path = "doc/conf.py"
-    with open(conf_path, "r") as f:
+    with open(conf_path) as f:
         content = f.read()
     pattern = r"(Copyright \d{4}-)(\d{4})(,DIPY)"
     match = re.search(pattern, content)
@@ -541,7 +541,7 @@ def _update_changelog(*, new_version, file_path="Changelog"):
     click.secho(f"--- Updating {file_path} ---", bold=True)
     today = datetime.date.today().strftime("%A, %B %d, %Y")
     entry = f"\n* {new_version} ({today})\n\n- TODO: add highlights here.\n"
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
     marker = "Releases\n~~~~~~~~"
     idx = content.find(marker)
@@ -577,7 +577,7 @@ def _update_index_announcements(*, new_version, index_path="doc/index.rst"):
         f"- :doc:`DIPY {new_version} <release_notes/{note_file}>` "
         f"released {release_date}.\n"
     )
-    with open(index_path, "r") as f:
+    with open(index_path) as f:
         lines = f.readlines()
     insert_after = None
     for i, line in enumerate(lines):
@@ -611,7 +611,7 @@ def _update_pyproject_version(*, new_version, file_path="pyproject.toml"):
         Path to pyproject.toml.
     """
     click.secho(f"--- Updating {file_path} version → {new_version} ---", bold=True)
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
     updated = re.sub(
         r'^version = ".*?"',
