@@ -129,7 +129,7 @@ class HorizonFlow(Workflow):
         ----------
         .. footbibliography::
         """
-        super(HorizonFlow, self).__init__(force=True)
+        super().__init__(force=True)
         verbose = True
         tractograms = []
         images = []

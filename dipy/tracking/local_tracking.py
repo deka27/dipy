@@ -433,7 +433,7 @@ class ParticleFilteringTracking(LocalTracking):
         self.particle_stream_statuses = np.empty(
             (2, self.particle_count), dtype=np.intp
         )
-        super(ParticleFilteringTracking, self).__init__(
+        super().__init__(
             direction_getter=direction_getter,
             stopping_criterion=stopping_criterion,
             seeds=seeds,

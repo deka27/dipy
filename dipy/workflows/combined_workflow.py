@@ -12,7 +12,7 @@ class CombinedWorkflow(Workflow):
         """
 
         self._optionals = {}
-        super(CombinedWorkflow, self).__init__(
+        super().__init__(
             output_strategy=output_strategy, mix_names=mix_names, force=force, skip=skip
         )
 

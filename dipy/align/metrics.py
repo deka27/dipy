@@ -228,7 +228,7 @@ class CCMetric(SimilarityMetric):
             the radius of the squared (cubic) neighborhood at each voxel to be
             considered to compute the cross correlation
         """
-        super(CCMetric, self).__init__(dim)
+        super().__init__(dim)
         self.sigma_diff = sigma_diff
         self.radius = radius
         self._connect_functions()
@@ -403,7 +403,7 @@ class EMMetric(SimilarityMetric):
             Gauss-Seidel optimization algorithm (not used if Demons Step is
             selected)
         """
-        super(EMMetric, self).__init__(dim)
+        super().__init__(dim)
         self.smooth = smooth
         self.inner_iter = inner_iter
         self.q_levels = q_levels
@@ -750,7 +750,7 @@ class SSDMetric(SimilarityMetric):
             and 'compute_backward' are called. Either 'demons' or
             'gauss_newton'
         """
-        super(SSDMetric, self).__init__(dim)
+        super().__init__(dim)
         self.smooth = smooth
         self.inner_iter = inner_iter
         self.step_type = step_type
