@@ -395,9 +395,9 @@ def tensor_to_pam(
     npeaks = 1 if npeaks < 1 else npeaks
     npeaks = min(npeaks, evals.shape[-1])
     shape = evals.shape[:3]
-    peaks_dirs = np.zeros((shape + (npeaks, 3)))
+    peaks_dirs = np.zeros(shape + (npeaks, 3))
     peaks_dirs[..., :npeaks, :] = evecs[..., :npeaks, :]
-    peaks_values = np.zeros((shape + (npeaks,)))
+    peaks_values = np.zeros(shape + (npeaks,))
     peaks_values[..., :npeaks] = evals[..., :npeaks]
 
     if generate_peaks_indices:

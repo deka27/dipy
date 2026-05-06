@@ -590,7 +590,7 @@ class MapmriFit(ReconstFit):
             return rtpp
 
         else:
-            rtpp_vec = np.zeros((ind_mat.shape[0]))
+            rtpp_vec = np.zeros(ind_mat.shape[0])
             count = 0
             for n in range(0, self.model.radial_order + 1, 2):
                 for j in range(1, 2 + n // 2):
@@ -644,7 +644,7 @@ class MapmriFit(ReconstFit):
             rtap_vec = const * Bm[sel] * ind_sum * self._mapmri_coef[sel]
             rtap = np.sum(rtap_vec)
         else:
-            rtap_vec = np.zeros((ind_mat.shape[0]))
+            rtap_vec = np.zeros(ind_mat.shape[0])
             count = 0
 
             for n in range(0, self.model.radial_order + 1, 2):
@@ -1114,7 +1114,7 @@ def b_mat_isotropic(index_matrix):
     .. footbibliography::
     """
 
-    B = np.zeros((index_matrix.shape[0]))
+    B = np.zeros(index_matrix.shape[0])
     for i in range(index_matrix.shape[0]):
         if index_matrix[i, 1] == 0:
             B[i] = genlaguerre(index_matrix[i, 0] - 1, 0.5)(0)

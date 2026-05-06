@@ -731,7 +731,7 @@ def _get_grad_forces_alt(vects, *, alpha=2.0, **kwargs):
     forces = forces[:nb_points] + forces[nb_points:]
     forces = forces * weights.reshape((nb_points, nb_points, 1))
     forces = forces.sum(0)
-    return forces.reshape((nb_points * 3))
+    return forces.reshape(nb_points * 3)
 
 
 @warning_for_keywords()

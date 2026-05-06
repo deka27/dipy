@@ -89,11 +89,7 @@ def test_syn_registration():
         # Test that it is, attribute by attribute, identical:
         for k in mapping.__dict__:
             npt.assert_(
-                (
-                    np.all(
-                        mapping.__getattribute__(k) == file_mapping.__getattribute__(k)
-                    )
-                )
+                np.all(mapping.__getattribute__(k) == file_mapping.__getattribute__(k))
             )
 
 
