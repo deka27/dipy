@@ -1,7 +1,8 @@
 [project]
 name = "dipy"
 description = "Diffusion MRI Imaging in Python"
-license = {file = "LICENSE"}
+license = "BSD-3-Clause"
+license-file = ["LICENSE"]
 readme = "README.rst"
 requires-python = ">=3.12"
 authors = [{ name = "DIPY developers", email = "dipy@python.org" }]
@@ -20,7 +21,6 @@ classifiers = [
     'Environment :: Console',
     'Intended Audience :: Developers',
     'Intended Audience :: Science/Research',
-    'License :: OSI Approved :: BSD License',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.12',
@@ -113,7 +113,7 @@ dipy_tensor2pam = "dipy.workflows.cli:run"
 build = [
     "meson-python>=0.13",
     "wheel",
-    "setuptools>=69.5,<83.0",
+    "setuptools>=77.0.3,<83.0",
     "packaging>=21",
     "ninja",
     "Cython>=0.29.35",
@@ -171,7 +171,7 @@ tracker = "https://github.com/dipy/dipy/issues"
 [build-system]
 build-backend = "mesonpy"
 requires = [
-    "meson-python>=0.13.1",
+    "meson-python>=0.18.0",
     "Cython>=3.0.4",
     "packaging>21.0",
     "wheel",
