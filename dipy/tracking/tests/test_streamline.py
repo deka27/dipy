@@ -887,8 +887,7 @@ def generate_sl(streamlines):
     -------
     generator
     """
-    for sl in streamlines:
-        yield sl
+    yield from streamlines
 
 
 def test_select_by_rois():
