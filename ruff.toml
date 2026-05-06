@@ -22,11 +22,13 @@ extend-select = [
   "PERF",
   "W",
   "UP",
+  "FURB",
 ]
 ignore = [
   "B905",
   "C901",
-  "F811"
+  "F811",
+  "FURB171",
 ]
 
 [lint.extend-per-file-ignores]
