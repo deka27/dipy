@@ -1481,9 +1481,7 @@ def extract_b0(dwi, b0_mask, *, group_contiguous_b0=False, strategy="mean"):
     strategy = strategy.lower()
     if strategy not in ["first", "all", "mean"]:
         raise ValueError(
-            "Invalid strategy: {}. Valid strategies are: first, all, mean.".format(
-                strategy
-            )
+            f"Invalid strategy: {strategy}. Valid strategies are: first, all, mean."
         )
 
     if group_contiguous_b0:
