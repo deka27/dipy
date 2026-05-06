@@ -392,7 +392,7 @@ def tensor_to_pam(
     pam : PeaksAndMetrics
         Object holding peaks information and metrics.
     """
-    npeaks = 1 if npeaks < 1 else npeaks
+    npeaks = max(npeaks, 1)
     npeaks = min(npeaks, evals.shape[-1])
     shape = evals.shape[:3]
     peaks_dirs = np.zeros(shape + (npeaks, 3))
