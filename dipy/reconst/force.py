@@ -349,8 +349,7 @@ class SignalIndex:
 
         if k > self.ntotal:
             warnings.warn(
-                f"k={k} exceeds index size ({self.ntotal}); "
-                f"clamping to {self.ntotal}.",
+                f"k={k} exceeds index size ({self.ntotal}); clamping to {self.ntotal}.",
                 UserWarning,
                 stacklevel=2,
             )

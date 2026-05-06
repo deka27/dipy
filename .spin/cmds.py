@@ -6,12 +6,12 @@ import os
 import re
 import shutil
 import subprocess
+import tomllib
 
 import click
 from packaging.version import Version
 from spin import util
 from spin.cmds import meson
-import tomllib
 
 
 # From scipy: benchmarks/benchmarks/common.py
@@ -1149,7 +1149,7 @@ def prepare_release(*, from_step, last_tag, new_version, maint_branch):
 
     if is_maint:
         click.secho(
-            f"\nMaintenance release mode — branch: {maint_branch} " f"({N} steps)",
+            f"\nMaintenance release mode — branch: {maint_branch} ({N} steps)",
             bold=True,
             fg="cyan",
         )

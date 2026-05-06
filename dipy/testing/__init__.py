@@ -53,8 +53,8 @@ def assert_percent_almost_equal(a, b, decimal=7, percent=0.99):
 
     if fraction < percent:
         raise AssertionError(
-            f"Only {fraction*100:.2f}% of elements match within {decimal} decimals; "
-            f"required {percent*100:.2f}%"
+            f"Only {fraction * 100:.2f}% of elements match within {decimal} decimals; "
+            f"required {percent * 100:.2f}%"
         )
 
 

@@ -329,7 +329,7 @@ class SlrWithQbxFlow(Workflow):
             except Exception as e:
                 logger.error(f"SLR with QBX failed: {e}")
                 logger.warning(
-                    "Skipping this pair of tractograms, " "continuing with next pair."
+                    "Skipping this pair of tractograms, continuing with next pair."
                 )
                 continue
 

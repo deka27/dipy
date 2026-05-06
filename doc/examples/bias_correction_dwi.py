@@ -127,7 +127,7 @@ _, mask = median_otsu(b0_mean, median_radius=4, numpass=4)
 mid_slice = data.shape[2] // 2
 
 print(f"Mean b0 shape : {b0_mean.shape}")
-print(f"Brain mask    : {mask.sum()} / {mask.size} voxels " f"({100*mask.mean():.0f}%)")
+print(f"Brain mask    : {mask.sum()} / {mask.size} voxels ({100 * mask.mean():.0f}%)")
 
 ###############################################################################
 # Part 1 — Applying Bias Field Correction with DIPY
@@ -303,9 +303,11 @@ cov_auto = _cov(b0_auto, mask=mask)
 
 print("\nCoefficient of Variation (lower = more uniform)")
 print(f"  Original : {cov_orig:.4f}")
-print(f"  poly     : {cov_poly:.4f}   ({100*(cov_orig-cov_poly)/cov_orig:+.1f}%)")
-print(f"  bspline  : {cov_bspline:.4f}   ({100*(cov_orig-cov_bspline)/cov_orig:+.1f}%)")
-print(f"  auto     : {cov_auto:.4f}   ({100*(cov_orig-cov_auto)/cov_orig:+.1f}%)")
+print(f"  poly     : {cov_poly:.4f}   ({100 * (cov_orig - cov_poly) / cov_orig:+.1f}%)")
+print(
+    f"  bspline  : {cov_bspline:.4f}   ({100 * (cov_orig - cov_bspline) / cov_orig:+.1f}%)"
+)
+print(f"  auto     : {cov_auto:.4f}   ({100 * (cov_orig - cov_auto) / cov_orig:+.1f}%)")
 print(
     f"\nTiming  —  poly: {t_poly:.1f} s   bspline: {t_bspline:.1f} s   "
     f"auto: {t_auto:.1f} s"
@@ -442,9 +444,7 @@ if _HAVE_SITK:
 cov0 = _cov(b0_mean, mask=mask)
 
 w = 14
-header = (
-    f"{'Method':<{w}}{'CoV':>{w}}{'ΔCoV%':>{w}}" f"{'Entropy':>{w}}{'Time (s)':>{w}}"
-)
+header = f"{'Method':<{w}}{'CoV':>{w}}{'ΔCoV%':>{w}}{'Entropy':>{w}}{'Time (s)':>{w}}"
 if _HAVE_SITK:
     header += f"{'Corr vs N4':>{w}}"
 print("\n" + header)
@@ -453,7 +453,7 @@ print("-" * len(header))
 for name, img, bf, t in entries:
     c = _cov(img, mask=mask)
     e = _entropy(img, mask=mask)
-    delta = f"{100*(cov0 - c)/cov0:+.1f}%" if name != "Original" else "—"
+    delta = f"{100 * (cov0 - c) / cov0:+.1f}%" if name != "Original" else "—"
     t_str = f"{t:.1f}" if t is not None else "—"
 
     if _HAVE_SITK and bf is not None and name != "N4":
@@ -463,7 +463,7 @@ for name, img, bf, t in entries:
     else:
         corr_str = "—"
 
-    row = f"{name:<{w}}{c:{w}.4f}{delta:>{w}}" f"{e:{w}.3f}{t_str:>{w}}"
+    row = f"{name:<{w}}{c:{w}.4f}{delta:>{w}}{e:{w}.3f}{t_str:>{w}}"
     if _HAVE_SITK:
         row += f"{corr_str:>{w}}"
     print(row)

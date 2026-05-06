@@ -361,8 +361,9 @@ class TabManager:
         """
         return list(
             filter(
-                lambda x: x.__class__.__name__ in types
-                and not x.tab_id == active_tab_id,
+                lambda x: (
+                    x.__class__.__name__ in types and not x.tab_id == active_tab_id
+                ),
                 self._tabs,
             )
         )

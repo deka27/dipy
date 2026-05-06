@@ -494,9 +494,9 @@ def test_patch2self_v3_volumes_count_not_divisible_by_5(rng):
 
     assert_equal(out.shape, data.shape)
     for i in range(out.shape[-1]):
-        assert (
-            out[..., i].std() > 0
-        ), f"Volume {i} was not written to the output buffer."
+        assert out[..., i].std() > 0, (
+            f"Volume {i} was not written to the output buffer."
+        )
 
 
 @needs_sklearn

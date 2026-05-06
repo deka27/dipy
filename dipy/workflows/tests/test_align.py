@@ -62,9 +62,9 @@ def test_reslice_auto_voxsize(caplog):
         assert any(
             "new_vox_size not provided" in record.message for record in warning_records
         ), "Expected warning about auto-calculation"
-        assert any(
-            "vox_factor=0.14" in record.message for record in warning_records
-        ), "Expected warning to include vox_factor value"
+        assert any("vox_factor=0.14" in record.message for record in warning_records), (
+            "Expected warning to include vox_factor value"
+        )
 
         out_path = reslice_flow.last_generated_outputs["out_resliced"]
         resliced = load_nifti_data(out_path)
@@ -144,7 +144,7 @@ def test_reslice_skip_idempotent(caplog):
 
         info_messages = [r.message for r in caplog.records if r.levelname == "INFO"]
         assert any("already linked" in m or "Skipping" in m for m in info_messages), (
-            "Expected idempotent skip message on second run. " f"Found: {info_messages}"
+            f"Expected idempotent skip message on second run. Found: {info_messages}"
         )
 
 

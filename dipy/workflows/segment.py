@@ -108,8 +108,7 @@ class MedianOtsuFlow(Workflow):
         if len(bvalues_files or []) > 0 and io_it:
             if len(bvalues_files) != len(io_it.inputs):
                 logger.error(
-                    "Number of b-values files must match the number of "
-                    "input volumes."
+                    "Number of b-values files must match the number of input volumes."
                 )
                 sys.exit(1)
 
@@ -708,8 +707,7 @@ class BrainMaskFlow(Workflow):
         if method == "median_otsu":
             if vol_idx is not None and bvalues_files is not None and io_it:
                 logger.warning(
-                    "'vol_idx' parameter is ignored when 'bvalues_files' is "
-                    "provided."
+                    "'vol_idx' parameter is ignored when 'bvalues_files' is provided."
                 )
 
             if bvalues_files is not None and not isinstance(bvalues_files, list):
