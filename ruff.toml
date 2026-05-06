@@ -16,6 +16,7 @@ extend-select = [
   "B",
   "C4",
   "ISC",
+  "FLY",
   "I",
   "C90",
   "PERF",
