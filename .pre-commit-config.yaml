@@ -14,8 +14,6 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
-        additional_dependencies:
-          - tomli
   - repo: local
     hooks:
       - id: generate_requirements.py
