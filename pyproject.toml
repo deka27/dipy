@@ -112,7 +112,6 @@ dipy_tensor2pam = "dipy.workflows.cli:run"
 [project.optional-dependencies]
 build = [
     "meson-python>=0.13",
-    "wheel",
     "setuptools>=77.0.3,<83.0",
     "packaging>=21",
     "ninja",
@@ -174,7 +173,6 @@ requires = [
     "meson-python>=0.18.0",
     "Cython>=3.0.4",
     "packaging>21.0",
-    "wheel",
     "scipy>=1.13.0",
     # numpy requirement for wheel builds for distribution on PyPI - building
     # against 2.x yields wheels that are also compatible with numpy 2.x at
