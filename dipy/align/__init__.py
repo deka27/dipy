@@ -31,7 +31,7 @@ from dipy.align._public import (
     motion_correction,
     read_mapping,
     register_dwi_series,
-    register_dwi_to_template,  # noqa
+    register_dwi_to_template,
     register_series,
     resample,
     rigid,

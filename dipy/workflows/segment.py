@@ -108,8 +108,7 @@ class MedianOtsuFlow(Workflow):
         if len(bvalues_files or []) > 0 and io_it:
             if len(bvalues_files) != len(io_it.inputs):
                 logger.error(
-                    "Number of b-values files must match the number of "
-                    "input volumes."
+                    "Number of b-values files must match the number of input volumes."
                 )
                 sys.exit(1)
 
@@ -551,8 +550,7 @@ class ClassifyTissueFlow(Workflow):
                 save_nifti(tissue_out_path, segmentation_final, affine)
                 save_nifti(opve, PVE, affine)
                 class_list.append(["0", "Background"])
-                for i in range(1, nclass + 1):
-                    class_list.append([f"{i}", f"Tissue_{i}"])
+                class_list.extend([f"{i}", f"Tissue_{i}"] for i in range(1, nclass + 1))
                 class_list.append(
                     [
                         "# Due to the nature of the HMRF algorithm",
@@ -708,8 +706,7 @@ class BrainMaskFlow(Workflow):
         if method == "median_otsu":
             if vol_idx is not None and bvalues_files is not None and io_it:
                 logger.warning(
-                    "'vol_idx' parameter is ignored when 'bvalues_files' is "
-                    "provided."
+                    "'vol_idx' parameter is ignored when 'bvalues_files' is provided."
                 )
 
             if bvalues_files is not None and not isinstance(bvalues_files, list):

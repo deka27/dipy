@@ -487,11 +487,10 @@ def test_reorient_bvecs(rng):
 
     # Shear components in the matrix need to be decomposed into rotation only,
     # and should not lead to scaling of the bvecs
-    shear_affines = []
-    for _ in np.where(~gt.b0s_mask)[0]:
-        shear_affines.append(
-            np.array([[1, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-        )
+    shear_affines = [
+        np.array([[1, 0, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        for _ in np.where(~gt.b0s_mask)[0]
+    ]
     shear_affines = np.stack(shear_affines, axis=-1)
     # atol is set to 1 here to do the scaling verification here,
     # so that the reorient_bvecs function does not throw an error itself

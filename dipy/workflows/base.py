@@ -89,8 +89,10 @@ def format_key_value_table(data, key_header="Key", value_header="Value", *, sort
             )
         wrapped_value = wrapped_value or [""]
         rows.append(f"| {key:<{key_width}} | {wrapped_value[0]:<{value_width}} |")
-        for extra_line in wrapped_value[1:]:
-            rows.append(f"| {'':<{key_width}} | {extra_line:<{value_width}} |")
+        rows.extend(
+            f"| {'':<{key_width}} | {extra_line:<{value_width}} |"
+            for extra_line in wrapped_value[1:]
+        )
     rows.append(separator)
     return "\n".join(rows)
 

@@ -91,7 +91,7 @@ def test_io_info():
         reference=str(filepath_dix["gs_volume.nii"]),
     )
 
-    with open(fname_log, "r") as file:
+    with open(fname_log) as file:
         lines = file.readlines()
         try:
             npt.assert_equal(lines[-3], "INFO Total number of unit bvectors 25\n")

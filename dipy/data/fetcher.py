@@ -53,8 +53,8 @@ HEADER_LIST = [
     {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64)"},
     # Firefox 77 Mac
     {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:77.0) Gecko/20100101 Firefox/77.0",  # noqa
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",  # noqa
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:77.0) Gecko/20100101 Firefox/77.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
         "Referer": "https://www.google.com/",
         "DNT": "1",
@@ -63,8 +63,8 @@ HEADER_LIST = [
     },
     # Firefox 77 Windows
     {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0",  # noqa
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",  # noqa
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
         "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://www.google.com/",
@@ -77,8 +77,8 @@ HEADER_LIST = [
         "Connection": "keep-alive",
         "DNT": "1",
         "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36",  # noqa
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",  # noqa
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Dest": "document",
@@ -90,8 +90,8 @@ HEADER_LIST = [
     {
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36",  # noqa
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",  # noqa
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
         "Sec-Fetch-Site": "same-origin",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-User": "?1",
@@ -773,7 +773,7 @@ fetch_taiwan_ntu_dsi = _make_fetcher(
     ],
     doc="Download a DSI dataset with 203 gradient directions",
     msg="See DSI203_license.txt for LICENSE. For the complete datasets"
-    + " please visit https://dsi-studio.labsolver.org",
+    " please visit https://dsi-studio.labsolver.org",
     data_size="91MB",
 )
 
@@ -848,7 +848,7 @@ fetch_scil_b0 = _make_fetcher(
     [Path("datasets_multi-site_all_companies.zip")],
     md5_list=["e9810fa5bf21b99da786647994d7d5b7"],
     doc="Download b=0 datasets from multiple MR systems (GE, Philips, "
-    + "Siemens) and different magnetic fields (1.5T and 3T)",
+    "Siemens) and different magnetic fields (1.5T and 3T)",
     data_size="9.2MB",
     unzip=True,
 )
@@ -904,8 +904,8 @@ fetch_cfin_multib = _make_fetcher(
     doc="Download CFIN multi b-value diffusion data",
     msg=(
         "This data was provided by Brian Hansen and Sune Jespersen"
-        + " More details about the data are available in their paper: "
-        + " https://www.nature.com/articles/sdata201672"
+        " More details about the data are available in their paper: "
+        " https://www.nature.com/articles/sdata201672"
     ),
 )
 
@@ -1278,11 +1278,11 @@ fetch_cti_rat1 = _make_fetcher(
         "34bc3d5acea9442d05ef185717780440",
     ],
     doc="Download Rat Brain DDE data for CTI reconstruction"
-    + " (Rat #1 data from Henriques et al. MRM 2021).",
+    " (Rat #1 data from Henriques et al. MRM 2021).",
     data_size="152.92 MB",
     msg=(
         "More details about the data are available in the paper: "
-        + "https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.28938"
+        "https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.28938"
     ),
 )
 
@@ -1316,12 +1316,12 @@ fetch_DiB_70_lte_pte_ste = _make_fetcher(
         Path("DiB_mask.nii.gz"),
     ],
     doc="Download QTE data with linear, planar, "
-    + "and spherical tensor encoding. If using this data please cite "
-    + "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
-    + "spherical tensor-valued diffusion MRI data by free waveform "
-    + "encoding in healthy brain, water, oil and liquid crystals. "
-    + "Data in Brief (2019),"
-    + "DOI: https://doi.org/10.1016/j.dib.2019.104208",
+    "and spherical tensor encoding. If using this data please cite "
+    "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
+    "spherical tensor-valued diffusion MRI data by free waveform "
+    "encoding in healthy brain, water, oil and liquid crystals. "
+    "Data in Brief (2019),"
+    "DOI: https://doi.org/10.1016/j.dib.2019.104208",
     md5_list=[
         "11f2e0d53e19061654eb3cdfc8fe9827",
         "15021885b4967437c8cf441c09045c25",
@@ -1351,12 +1351,12 @@ fetch_DiB_217_lte_pte_ste = _make_fetcher(
         Path("DiB_mask.nii.gz"),
     ],
     doc="Download QTE data with linear, planar, "
-    + "and spherical tensor encoding. If using this data please cite "
-    + "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
-    + "spherical tensor-valued diffusion MRI data by free waveform "
-    + "encoding in healthy brain, water, oil and liquid crystals. "
-    + "Data in Brief (2019),"
-    + "DOI: https://doi.org/10.1016/j.dib.2019.104208",
+    "and spherical tensor encoding. If using this data please cite "
+    "F Szczepankiewicz, S Hoge, C-F Westin. Linear, planar and "
+    "spherical tensor-valued diffusion MRI data by free waveform "
+    "encoding in healthy brain, water, oil and liquid crystals. "
+    "Data in Brief (2019),"
+    "DOI: https://doi.org/10.1016/j.dib.2019.104208",
     md5_list=[
         "424e9cf75b20bc1f7ae1acde26b26da0",
         "8e70d14fb8f08065a7a0c4d3033179c6",
@@ -2634,16 +2634,12 @@ def read_mni_template(*, version="a", contrast="T2"):
         if isinstance(contrast, str):
             return nib.load(file_dict_a[contrast])
         else:
-            out_list = []
-            for k in contrast:
-                out_list.append(nib.load(file_dict_a[k]))
+            out_list = [nib.load(file_dict_a[k]) for k in contrast]
     elif version == "c":
         if isinstance(contrast, str):
             return nib.load(file_dict_c[contrast])
         else:
-            out_list = []
-            for k in contrast:
-                out_list.append(nib.load(file_dict_c[k]))
+            out_list = [nib.load(file_dict_c[k]) for k in contrast]
     else:
         raise ValueError("Only 2009a and 2009c versions are available")
     return out_list
@@ -2929,15 +2925,16 @@ def get_file_formats():
         Path to the reference anatomical image.
     """
     ref_anat = dipy_home / "bundle_file_formats_example" / "template0.nii.gz"
-    bundles_list = []
-    for filename in [
-        "cc_m_sub.trk",
-        "laf_m_sub.tck",
-        "lpt_m_sub.fib",
-        "raf_m_sub.vtk",
-        "rpt_m_sub.dpy",
-    ]:
-        bundles_list.append(dipy_home / "bundle_file_formats_example" / filename)
+    bundles_list = [
+        dipy_home / "bundle_file_formats_example" / filename
+        for filename in [
+            "cc_m_sub.trk",
+            "laf_m_sub.tck",
+            "lpt_m_sub.fib",
+            "raf_m_sub.vtk",
+            "rpt_m_sub.dpy",
+        ]
+    ]
 
     return bundles_list, ref_anat
 
@@ -3230,7 +3227,7 @@ def fetch_hcp(
     References
     ----------
     .. footbibliography::
-    """  # noqa: E501
+    """
     if not has_boto3:
         raise ValueError(
             "'fetch_hcp' requires boto3 and it is"
@@ -3356,7 +3353,7 @@ def _hbn_downloader(my_path, derivative, subjects, client):
         query = client.list_objects(
             Bucket="fcp-indi",
             Prefix=f"data/Projects/HBN/BIDS_curated/derivatives/{derivative}/sub-{subject}/",
-        )  # noqa
+        )
         query_content = query.get("Contents", None)
         if query_content is None:
             raise ValueError(f"Could not find derivatives data for subject {subject}")
@@ -3445,7 +3442,7 @@ def fetch_hbn(subjects, *, path=None, include_afq=False):
     else:
         TripWire(
             "The `fetch_hbn` function requires the boto3"
-            + " library, but that is not installed."
+            " library, but that is not installed."
         )
 
     # Anonymous access:

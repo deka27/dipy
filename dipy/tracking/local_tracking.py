@@ -163,12 +163,12 @@ class LocalTracking:
         ):
             warn(
                 "Unidirectional tractography will be performed "
-                + "without providing initial directions nor "
-                + "randomizing extracted initial forward "
-                + "directions. This may introduce directional "
-                + "biases in the reconstructed streamlines. "
-                + "See ``initial_directions`` and "
-                + "``randomize_forward_direction`` parameters.",
+                "without providing initial directions nor "
+                "randomizing extracted initial forward "
+                "directions. This may introduce directional "
+                "biases in the reconstructed streamlines. "
+                "See ``initial_directions`` and "
+                "``randomize_forward_direction`` parameters.",
                 stacklevel=2,
             )
 
@@ -433,7 +433,7 @@ class ParticleFilteringTracking(LocalTracking):
         self.particle_stream_statuses = np.empty(
             (2, self.particle_count), dtype=np.intp
         )
-        super(ParticleFilteringTracking, self).__init__(
+        super().__init__(
             direction_getter=direction_getter,
             stopping_criterion=stopping_criterion,
             seeds=seeds,

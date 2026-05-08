@@ -205,9 +205,9 @@ def test_reconst_powermap_basic():
             npt.assert_equal(powermap_data.shape, volume.shape[:-1])
             assert np.all(powermap_data >= 0), "Powermap should be non-negative"
             assert not np.all(powermap_data == 0), "Powermap should not be all zeros"
-            assert np.isfinite(
-                powermap_data
-            ).all(), "Powermap should contain finite values"
+            assert np.isfinite(powermap_data).all(), (
+                "Powermap should contain finite values"
+            )
 
             # Test different SH orders
             for sh_order in [4, 6]:
@@ -390,9 +390,9 @@ def test_reconst_powermap_edge_cases():
                 powermaps.append(powermap_data)
 
             # Different norm factors should produce different results
-            assert not np.allclose(
-                powermaps[0], powermaps[1], rtol=0.1
-            ), "Different norm factors should produce different results"
+            assert not np.allclose(powermaps[0], powermaps[1], rtol=0.1), (
+                "Different norm factors should produce different results"
+            )
 
 
 # ---------------------------------------------------------------------------

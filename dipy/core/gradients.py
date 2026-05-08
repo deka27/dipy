@@ -165,8 +165,8 @@ class GradientTable:
                 else:
                     raise ValueError(
                         f"{btens} is an invalid value for btens. "
-                        + "Please provide one of the following: "
-                        + "'LTE', 'PTE', 'STE', 'CTE'."
+                        "Please provide one of the following: "
+                        "'LTE', 'PTE', 'STE', 'CTE'."
                     )
                 for i, (bvec, bval) in enumerate(zip(self.bvecs, self.bvals)):
                     if btens == "STE":
@@ -200,8 +200,8 @@ class GradientTable:
                     else:
                         raise ValueError(
                             f"{btens[i]} is an invalid value in btens. "
-                            + "Array element options: 'LTE', 'PTE', 'STE', "
-                            + "'CTE'."
+                            "Array element options: 'LTE', 'PTE', 'STE', "
+                            "'CTE'."
                         )
                 self.btens = b_tensors
             elif isinstance(btens, np.ndarray) and btens.shape == (
@@ -213,9 +213,9 @@ class GradientTable:
             else:
                 raise ValueError(
                     f"{btens} is an invalid value for btens. "
-                    + "Please provide a string, an array of "
-                    + "strings, or an array of exact b-tensors. "
-                    + "String options: 'LTE', 'PTE', 'STE', 'CTE'"
+                    "Please provide a string, an array of "
+                    "strings, or an array of exact b-tensors. "
+                    "String options: 'LTE', 'PTE', 'STE', 'CTE'"
                 )
         else:
             self.btens = None
@@ -1481,9 +1481,7 @@ def extract_b0(dwi, b0_mask, *, group_contiguous_b0=False, strategy="mean"):
     strategy = strategy.lower()
     if strategy not in ["first", "all", "mean"]:
         raise ValueError(
-            "Invalid strategy: {}. Valid strategies are: first, all, mean.".format(
-                strategy
-            )
+            f"Invalid strategy: {strategy}. Valid strategies are: first, all, mean."
         )
 
     if group_contiguous_b0:

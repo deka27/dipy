@@ -172,7 +172,7 @@ def get_polydata_triangles(polydata, dtype=None):
         for i in range(nbr_cells):
             ids = polydata.GetCell(i).GetPointIds()
             for j in range(ids.GetNumberOfIds() - 2):
-                triangles.append([ids.GetId(j), ids.GetId(j + 1), ids.GetId(j + 2)])
+                triangles.append([ids.GetId(j), ids.GetId(j + 1), ids.GetId(j + 2)])  # noqa: PERF401
         triangles = np.array(triangles)
     else:
         if not (vtk_polys[::4] == 3).all():

@@ -1170,7 +1170,7 @@ class SymmetricDiffeomorphicRegistration(DiffeomorphicRegistration):
             to be called after each iteration (this optimizer will call this
             function passing self as parameter)
         """
-        super(SymmetricDiffeomorphicRegistration, self).__init__(metric=metric)
+        super().__init__(metric=metric)
         if level_iters is None:
             level_iters = [100, 100, 25]
 
