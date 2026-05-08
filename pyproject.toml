@@ -217,6 +217,7 @@ Release = [
 [tool.pytest]
 minversion = "9"
 addopts = [
+    "-ra",
     "--ignore=dipy/testing/decorators.py",
     "--ignore-glob='bench*.py'",
     "--ignore-glob=**/benchmarks/*"
