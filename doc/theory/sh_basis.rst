@@ -161,7 +161,7 @@ are also taken into account when reconstructing a spherical function. These
 full bases can successfully reconstruct asymmetric signals as well as
 symmetric signals.
 
-NOTE: 
+NOTE:
 The definition of spherical harmonics that DIPY utilizes does not match the one
 in Wikipedia and scipy. Instead, DIPY follows the dMRI literature conventions,
 like in ``descoteaux07`` and ``tournier07``.
