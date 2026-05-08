@@ -222,6 +222,7 @@ addopts = [
     "--ignore-glob=**/benchmarks/*"
 ]
 log_level = "INFO"
+strict = true
 filterwarnings = [
     # FURY
     "ignore:.*You do not have FURY installed.*:UserWarning",
