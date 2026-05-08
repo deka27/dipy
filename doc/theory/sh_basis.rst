@@ -76,7 +76,7 @@ directly from the literature.
 
 In both cases, $\Re$ denotes the real part of the spherical harmonic basis, and
 $\Im$ denotes the imaginary part. The SH bases are both orthogonal and real. Moreover,
-the `descoteaux07` basis is orthonormal.
+the ``descoteaux07`` basis is orthonormal.
 
 By alternately selecting the real or imaginary part of the
 original SH basis, the modified SH bases have the properties of being both

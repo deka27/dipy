@@ -11,6 +11,13 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: rst-backticks
+        exclude: "^doc/release_notes|^doc/old_highlights.rst"
+      - id: rst-directive-colons
+      - id: rst-inline-touching-normal
   - repo: local
     hooks:
       - id: generate_requirements.py
