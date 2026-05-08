@@ -2,15 +2,9 @@
 """Generate requirements/*.txt files from pyproject.toml."""
 
 import sys
+import tomllib
 from pathlib import Path
 
-try:  # standard module since Python 3.11
-    import tomllib as toml
-except ImportError:
-    try:  # available for older Python via pip
-        import tomli as toml
-    except ImportError:
-        sys.exit("Please install `tomli` first: `pip install tomli`")
 
 script_pth = Path(__file__)
 repo_dir = script_pth.parent.parent
@@ -203,7 +197,7 @@ def expand_project_extras(
 
 def main():
     """Load ``pyproject.toml`` and regenerate the requirements directory."""
-    pyproject = toml.loads((repo_dir / "pyproject.toml").read_text())
+    pyproject = tomllib.loads((repo_dir / "pyproject.toml").read_text())
     project = pyproject["project"]
     project_name = project["name"]
     optional_deps = project.get("optional-dependencies", {})
