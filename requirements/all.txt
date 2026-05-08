@@ -4,7 +4,6 @@ asv
 pyperf
 virtualenv
 meson-python>=0.13
-wheel
 setuptools>=77.0.3,<83.0
 packaging>=21
 ninja
