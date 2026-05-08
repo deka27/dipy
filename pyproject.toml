@@ -216,7 +216,11 @@ Release = [
 
 [tool.pytest]
 minversion = "9"
-addopts = "--ignore=dipy/testing/decorators.py --ignore-glob='bench*.py' --ignore-glob=**/benchmarks/*"
+addopts = [
+    "--ignore=dipy/testing/decorators.py",
+    "--ignore-glob='bench*.py'",
+    "--ignore-glob=**/benchmarks/*"
+]
 filterwarnings = [
     # FURY
     "ignore:.*You do not have FURY installed.*:UserWarning",
