@@ -221,6 +221,7 @@ addopts = [
     "--ignore-glob='bench*.py'",
     "--ignore-glob=**/benchmarks/*"
 ]
+log_level = "INFO"
 filterwarnings = [
     # FURY
     "ignore:.*You do not have FURY installed.*:UserWarning",
