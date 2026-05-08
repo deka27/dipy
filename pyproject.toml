@@ -124,11 +124,11 @@ build = [
 all = ["dipy[build, dev, doc, style, viz, optional, benchmark]"]
 style = ["ruff", "pre-commit"]
 viz = ["fury>=0.12.0", "matplotlib"]
-test = ["pytest", "coverage", "coveralls", "codecov", "asv"]
+test = ["pytest>=9", "coverage", "coveralls", "codecov", "asv"]
 ml = ["scikit_learn", "pandas", "statsmodels>=0.14.0", "tables", "torch"]
 dev = [
     "dipy[build, style]",
-    "pytest",
+    "pytest>=9",
     "coverage",
     "coveralls",
     "codecov",
@@ -214,7 +214,8 @@ Release = [
     ".spin/cmds.py:prepare_release",
 ]
 
-[tool.pytest.ini_options]
+[tool.pytest]
+minversion = "9"
 addopts = "--ignore=dipy/testing/decorators.py --ignore-glob='bench*.py' --ignore-glob=**/benchmarks/*"
 filterwarnings = [
     # FURY
